@@ -120,7 +120,6 @@ void draw_registers(chip8emu* emu) {
     for (int i = 0; i < 16; ++i) {
         tb_printf(64 + 3, 1 + i, 0, 0, "V%X %02X", i, emu->V[i]);
     }
-    tb_present();
 }
 
 void draw_all(chip8emu* emu) {
@@ -133,7 +132,6 @@ void draw_all(chip8emu* emu) {
 
 static cnd_t draw_cnd;
 static mtx_t draw_mtx;
-static mtx_t key_mtx;
 
 int emulator_thread(void* arg) {
     chip8emu * emu = (chip8emu*) arg;
@@ -143,9 +141,7 @@ int emulator_thread(void* arg) {
         elapsed_clk = clock() - start_clk;
         if (elapsed_clk >= (CLOCKS_PER_SEC/100)) { /* 100Hz */
             start_clk = clock();
-            mtx_lock(&key_mtx);
             chip8emu_exec_cycle(emu);
-            mtx_unlock(&key_mtx);
             draw_registers(emu);
             tb_present();            
         }
@@ -157,6 +153,15 @@ void draw_callback(uint8_t *buf) {
     mtx_lock(&draw_mtx);
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
+}
+
+static uint8_t keybuffer[0x10] = {0};
+
+bool keystate_callback(uint8_t key) {
+    bool ret;
+    ret = keybuffer[key] > 0;
+    if (ret) keybuffer[key]--;
+    return ret;
 }
 
 int display_draw_thread(void *arg) {
@@ -187,6 +192,7 @@ int main(int argc, char **argv) {
 
     chip8emu *emu = chip8emu_new();
     emu->draw = &draw_callback;
+    emu->keystate= &keystate_callback;
     emu->beep = &beep;
 
     int ret = tb_init();
@@ -220,8 +226,7 @@ int main(int argc, char **argv) {
 
     struct tb_event ev;
 
-    while (true) {
-        tb_peek_event(&ev, 30);
+    while (tb_poll_event(&ev)) {
         switch (ev.type) {
         case TB_EVENT_KEY:
             switch (ev.key) {
@@ -229,62 +234,56 @@ int main(int argc, char **argv) {
                 goto quit;
                 break;
             case TB_KEY_ENTER:
-                mtx_lock(&key_mtx);
-                emu->key[0xA] = 1;
-                mtx_unlock(&key_mtx);
+                keybuffer[0xA]++;
                 break;
             default:
-                mtx_lock(&key_mtx);
                 switch (ev.ch) {
                 case '0':
-                    emu->key[0x0] = 1;
+                    keybuffer[0x0]++;
                     break;
                 case '1':
-                    emu->key[0x1] = 1;
+                    keybuffer[0x1]++;
                     break;
                 case '2':
-                    emu->key[0x2] = 1;
+                    keybuffer[0x2]++;
                     break;
                 case '3':
-                    emu->key[0x3] = 1;
+                    keybuffer[0x3]++;
                     break;
                 case '4':
-                    emu->key[0x4] = 1;
+                    keybuffer[0x4]++;
                     break;
                 case '5':
-                    emu->key[0x5] = 1;
+                    keybuffer[0x5]++;
                     break;
                 case '6':
-                    emu->key[0x6] = 1;
+                    keybuffer[0x6]++;
                     break;
                 case '7':
-                    emu->key[0x7] = 1;
+                    keybuffer[0x7]++;
                     break;
                 case '8':
-                    emu->key[0x8] = 1;
+                    keybuffer[0x8]++;
                     break;
                 case '9':
-                    emu->key[0x9] = 1;
+                    keybuffer[0x9]++;
                     break;
                 case '+':
-                    emu->key[0xB] = 1;
+                    keybuffer[0xB]++;
                     break;
                 case '-':
-                    emu->key[0xC] = 1;
+                    keybuffer[0xC]++;
                     break;
                 case '*':
-                    emu->key[0xD] = 1;
+                    keybuffer[0xD]++;
                     break;
                 case '/':
-                    emu->key[0xE] = 1;
+                    keybuffer[0xE]++;
                     break;
                 case '.':
-                    emu->key[0xF] = 1;
+                    keybuffer[0xF]++;
                     break;
-                default:
-                    memset(emu->key, 0, 16);
                 }
-                mtx_unlock(&key_mtx);
             }
             break;
         case TB_EVENT_RESIZE:

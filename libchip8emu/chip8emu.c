@@ -34,7 +34,6 @@ chip8emu *chip8emu_new(void)
     emu->sp     = 0;      /* Reset stack pointer */
 
     memset(&(emu->gfx), 0, 64 * 32);      /* Clear display */
-    memset(&(emu->key), 0, 16);           /* Clear key presses */
     memset(&(emu->stack), 0, 16);         /* Clear stack */
     memset(&(emu->V), 0, 16);             /* Clear registers V0-VF */
     memset(&(emu->memory), 0, 4096);      /* Clear memory */
@@ -48,6 +47,7 @@ chip8emu *chip8emu_new(void)
     emu->sound_timer = 0;
 
     emu->draw = 0;
+    emu->keystate = 0;
     emu->beep = 0;
 
     return emu;
@@ -215,14 +215,14 @@ void chip8emu_exec_cycle(chip8emu *emu)
     case 0xE000:
         switch (emu->opcode & 0x00FF) {
         case 0x009E: /* EX9E: Skips the next instruction if the key stored in VX is pressed */
-            if(emu->key[emu->V[(emu->opcode & 0x0F00) >> 8]]) {
+            if(emu->keystate(emu->V[(emu->opcode & 0x0F00) >> 8])) {
                 emu->pc += 4;
             } else {
                 emu->pc += 2;
             }
             break;
         case 0x00A1: /* EXA1: Skips the next instruction if the key stored in VX isn't pressed */
-            if(!emu->key[emu->V[(emu->opcode & 0x0F00) >> 8]]) {
+            if(!emu->keystate(emu->V[(emu->opcode & 0x0F00) >> 8])) {
                 emu->pc += 4;
             } else {
                 emu->pc += 2;
@@ -239,8 +239,8 @@ void chip8emu_exec_cycle(chip8emu *emu)
             emu->pc += 2;
             break;
         case 0x000A: /* FX0A: A key press is awaited, and then stored in VX. (blocking) */
-            for (int i = 0; i < 0x10; i++) {
-                if (emu->key[i]) {
+            for (uint8_t i = 0; i < 0x10; i++) {
+                if (emu->keystate(i)) {
                     emu->V[(emu->opcode & 0x0F00) >> 8] = i;
                     emu->pc += 2;
                 }
