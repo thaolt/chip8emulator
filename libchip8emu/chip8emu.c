@@ -53,12 +53,6 @@ chip8emu *chip8emu_new(void)
     return emu;
 }
 
-void chip8emu_load_rom(chip8emu *emu, uint8_t *code, int code_size)
-{
-    for(int i = 0; i < code_size; ++i)
-      emu->memory[i + 512] = code[i];
-}
-
 void chip8emu_free(chip8emu *emu)
 {
     free(emu);
@@ -302,4 +296,32 @@ void chip8emu_exec_cycle(chip8emu *emu)
             emu->beep();
         --emu->sound_timer;
     }
+}
+
+
+int chip8emu_load_code(chip8emu *emu, uint8_t *code, long code_size)
+{
+    for(int i = 0; i < code_size; ++i)
+      emu->memory[i + 512] = code[i];
+    return C8ERR_OK;
+}
+
+
+int chip8emu_load_rom(chip8emu *emu, const char *filename)
+{
+    FILE *fileptr;
+    uint8_t code_buffer[4096];
+    long filelen;
+
+    memset(code_buffer, 0, 4096);
+
+    fileptr = fopen(filename, "rb");
+    fseek(fileptr, 0, SEEK_END);
+    filelen = ftell(fileptr);
+    rewind(fileptr);
+
+    fread(code_buffer, (unsigned long) filelen, 1, fileptr);
+    fclose(fileptr);
+
+    return chip8emu_load_code(emu, code_buffer, filelen + 1);
 }

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define C8ERR_OK 0
+
 typedef struct chip8emu chip8emu;
 
 struct chip8emu
@@ -30,7 +32,8 @@ struct chip8emu
 
 chip8emu* chip8emu_new(void);
 void chip8emu_free(chip8emu*);
-void chip8emu_load_rom(chip8emu *emu, uint8_t* code, int code_size);
+int chip8emu_load_code(chip8emu *emu, uint8_t* code, long code_size);
+int chip8emu_load_rom(chip8emu* emu, const char* filename);
 void chip8emu_exec_cycle(chip8emu *emu);
 
 
