@@ -23,7 +23,8 @@ struct chip8emu
     uint16_t  sp;           /* stack pointer */
 
     uint8_t   key[16];
-    bool      draw_flag;
+    bool draw_flag;
+    void (*beep)();
 
 };
 

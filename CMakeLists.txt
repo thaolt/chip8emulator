@@ -10,5 +10,4 @@ link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
 add_subdirectory(3rdparty)
 add_subdirectory(libchip8emu)
-add_subdirectory(emulator)
 add_subdirectory(emu-termbox)

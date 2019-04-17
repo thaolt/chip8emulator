@@ -108,7 +108,11 @@ void draw_layout() {
 
 }
 
-static uint8_t disp_buffer[64*32];
+uint8_t *disp_buffer;
+
+void beep() {
+
+}
 
 void draw_all() {
     tb_clear();
@@ -119,34 +123,66 @@ void draw_all() {
 
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
-    memset(disp_buffer, 0, 64*32);
-    disp_buffer[0] = 1;
-    disp_buffer[64] = 1;
-    disp_buffer[65] = 1;
-    disp_buffer[64*32 - 1] = 1;
+
+    chip8emu *emu = chip8emu_new();
+    emu->beep = &beep;
+    disp_buffer = emu->gfx;
+
+    FILE *fileptr;
+    char *code_buffer;
+    unsigned long filelen;
+
+    fileptr = fopen("/home/thaolt/Workspaces/build-chip8emulator-Desktop-Minimum-Size-Release/emu-termbox/BLITZ.ch8", "rb");
+    fseek(fileptr, 0, SEEK_END);          // Jump to the end of the file
+    filelen = (unsigned long) ftell(fileptr);             // Get the current byte offset in the file
+    rewind(fileptr);                      // Jump back to the beginning of the file
+    uint32_t buffer_len = (uint32_t) (filelen+1)*sizeof(char);
+
+    code_buffer = (char *)malloc(buffer_len); // Enough memory for file + \0
+    fread(code_buffer, filelen, 1, fileptr); // Read in the entire file
+    fclose(fileptr); // Close the file
+
     int ret = tb_init();
     if (ret) {
         log_error("tb_init() failed with error code %d\n", ret);
         return 1;
     }
+
+    chip8emu_load_rom(emu, code_buffer, buffer_len);
+
     draw_all();
 
-    struct tb_event ev;
-    while (tb_poll_event(&ev)) {
-        switch (ev.type) {
-        case TB_EVENT_KEY:
-            switch (ev.key) {
-            case TB_KEY_ESC:
-                goto done;
-                break;
-            }
-            break;
-        case TB_EVENT_RESIZE:
-            draw_all();
-            break;
+    while ( true ) {
+
+        chip8emu_exec_cycle(emu);
+        if (emu->draw_flag) {
+            draw_display(emu->gfx);
+            emu->draw_flag = false;
         }
     }
-done:
-    tb_shutdown();
+
+//    struct tb_event ev;
+//    while (tb_poll_event(&ev)) {
+//        chip8emu_exec_cycle(emu);
+//        if (emu->draw_flag) {
+//            draw_display(emu->gfx);
+//            emu->draw_flag = false;
+//        }
+//        log_info("asdasdasdasasd");
+//        switch (ev.type) {
+//        case TB_EVENT_KEY:
+//            switch (ev.key) {
+//            case TB_KEY_ESC:
+//                goto done;
+//                break;
+//            }
+//            break;
+//        case TB_EVENT_RESIZE:
+//            draw_all();
+//            break;
+//        }
+//    }
+//done:
+//    tb_shutdown();
     return 0;
 }
