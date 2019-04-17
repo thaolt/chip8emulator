@@ -4,3 +4,6 @@
 [submodule "3rdparty/log.c/origin"]
 	path = 3rdparty/log.c/origin
 	url = https://github.com/rxi/log.c.git
+[submodule "3rdparty/tinycthread"]
+	path = 3rdparty/tinycthread
+	url = https://github.com/tinycthread/tinycthread.git

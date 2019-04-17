@@ -2,10 +2,15 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "termbox.h"
 #include "log.h"
 #include "chip8emu.h"
+#include "tinycthread.h"
+
+#define DISPLAY_WIDTH   64
+#define DISPLAY_HEIGHT  16
 
 static const uint32_t box_drawing[] = {
     0x250C, /* ┌ */
@@ -72,8 +77,7 @@ void draw_keyboard() {
 
 
 void draw_layout() {
-    uint8_t display_width = 64;
-    uint8_t display_height = 16;
+
     const char *disp_title = "Display";
     uint8_t disp_title_len = (uint8_t) strlen(disp_title);
 
@@ -82,33 +86,31 @@ void draw_layout() {
 
     tb_change_cell(0, 0, box_drawing[0], 0, 0);
     tb_print(disp_title, 1, 0, 0, 0);
-    for (int x = disp_title_len+1; x < display_width + 1; ++x) {
+    for (int x = disp_title_len+1; x < DISPLAY_WIDTH + 1; ++x) {
         tb_change_cell(x, 0, box_drawing[1], 0, 0);
     }
-    tb_change_cell(display_width+1, 0, box_drawing[2], 0, 0);
-    tb_print(reg_pane_title, display_width+2, 0, 0, 0);
-    for (int x = display_width + 2 + reg_pane_title_len; x < tb_width()-1; ++x) {
+    tb_change_cell(DISPLAY_WIDTH+1, 0, box_drawing[2], 0, 0);
+    tb_print(reg_pane_title, DISPLAY_WIDTH+2, 0, 0, 0);
+    for (int x = DISPLAY_WIDTH + 2 + reg_pane_title_len; x < tb_width()-1; ++x) {
         tb_change_cell(x, 0, box_drawing[1], 0, 0);
     }
     tb_change_cell(tb_width()-1, 0, box_drawing[3], 0, 0);
-    for (int y = 1; y < display_height + 1; ++y) {
+    for (int y = 1; y < DISPLAY_HEIGHT + 1; ++y) {
         tb_change_cell(0, y, box_drawing[4], 0, 0);
-        tb_change_cell(display_width + 1, y, box_drawing[4], 0, 0);
+        tb_change_cell(DISPLAY_WIDTH + 1, y, box_drawing[4], 0, 0);
         tb_change_cell(tb_width()-1, y, box_drawing[4], 0, 0);
     }
-    tb_change_cell(0, display_height+1, box_drawing[5], 0, 0);
-    for (int x = 1; x < display_width + 1; ++x) {
-        tb_change_cell(x, display_height+1, box_drawing[1], 0, 0);
+    tb_change_cell(0, DISPLAY_HEIGHT+1, box_drawing[5], 0, 0);
+    for (int x = 1; x < DISPLAY_WIDTH + 1; ++x) {
+        tb_change_cell(x, DISPLAY_HEIGHT+1, box_drawing[1], 0, 0);
     }
-    tb_change_cell(display_width+1, display_height+1, box_drawing[6], 0, 0);
-    for (int x = display_width + 2; x < tb_width()-1; ++x) {
-        tb_change_cell(x, display_height+1, box_drawing[1], 0, 0);
+    tb_change_cell(DISPLAY_WIDTH+1, DISPLAY_HEIGHT+1, box_drawing[6], 0, 0);
+    for (int x = DISPLAY_WIDTH + 2; x < tb_width()-1; ++x) {
+        tb_change_cell(x, DISPLAY_HEIGHT+1, box_drawing[1], 0, 0);
     }
-    tb_change_cell(tb_width()-1, display_height+1, box_drawing[7], 0, 0);
+    tb_change_cell(tb_width()-1, DISPLAY_HEIGHT+1, box_drawing[7], 0, 0);
 
 }
-
-uint8_t *disp_buffer;
 
 void beep() {
 
@@ -121,10 +123,10 @@ void draw_registers(chip8emu* emu) {
     tb_present();
 }
 
-void draw_all() {
+void draw_all(chip8emu* emu) {
     tb_clear();
     draw_layout();
-    draw_display(disp_buffer);
+    draw_display(emu->gfx);
     tb_present();
 }
 
@@ -133,7 +135,6 @@ int main(int argc, char **argv) {
 
     chip8emu *emu = chip8emu_new();
     emu->beep = &beep;
-    disp_buffer = emu->gfx;
 
     int ret = tb_init();
     if (ret) {
@@ -141,13 +142,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/build-chip8emulator-Desktop-Minimum-Size-Release/emu-termbox/UFO");
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/chip8emulator/roms/UFO");
 
-    draw_all();
+    draw_all(emu);
 
     struct tb_event ev;
     while (true) {
-        tb_peek_event(&ev, 15);
+        tb_peek_event(&ev, 1);
         chip8emu_exec_cycle(emu);
         draw_registers(emu);
         if (emu->draw_flag) {
@@ -163,7 +164,7 @@ int main(int argc, char **argv) {
             }
             break;
         case TB_EVENT_RESIZE:
-            draw_all();
+            draw_all(emu);
             break;
         }
     }
