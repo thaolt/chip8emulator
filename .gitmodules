@@ -1,3 +1,0 @@
-[submodule "3rdparty/termbox"]
-	path = 3rdparty/termbox
-	url = https://github.com/nsf/termbox.git
