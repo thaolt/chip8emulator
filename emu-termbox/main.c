@@ -1,147 +1,150 @@
-#include "termbox.h"
-#include "chip8emu.h"
-
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
-static int curCol = 0;
-static int curRune = 0;
-static struct tb_cell *backbuf;
-static int bbw = 0, bbh = 0;
+#include "termbox.h"
+#include "log.h"
+#include "chip8emu.h"
 
-static const uint32_t runes[] = {
-    0x20, // ' '
-    0x2591, // '░'
-    0x2592, // '▒'
-    0x2593, // '▓'
-    0x2588, // '█'
+static const uint32_t box_drawing[] = {
+    0x250C, /* ┌ */
+    0x2500, /* ─ */
+    0x252C, /* ┬ */
+    0x2510, /* ┐ */
+    0x2502, /* │ */
+    0x2514, /* └ */
+    0x2534, /* ┴ */
+    0x2518, /* ┘ */
 };
 
-#define len(a) (sizeof(a)/sizeof(a[0]))
-
-static const uint16_t colors[] = {
-    TB_BLACK,
-    TB_RED,
-    TB_GREEN,
-    TB_YELLOW,
-    TB_BLUE,
-    TB_MAGENTA,
-    TB_CYAN,
-    TB_WHITE,
+static const uint32_t block_char[] = {
+    ' ',
+    0x2580, /* ▀ */
+    0x2584, /* ▄ */
+    0x2588, /* █ */
 };
-void updateAndDrawButtons(int *current, int x, int y, int mx, int my, int n, void (*attrFunc)(int, uint32_t*, uint16_t*, uint16_t*)) {
-    int lx = x;
-    int ly = y;
-    for (int i = 0; i < n; i++) {
-        if (lx <= mx && mx <= lx+3 && ly <= my && my <= ly+1) {
-            *current = i;
-        }
-        uint32_t r;
-        uint16_t fg, bg;
-        (*attrFunc)(i, &r, &fg, &bg);
-                tb_change_cell(lx+0, ly+0, r, fg, bg);
-                tb_change_cell(lx+1, ly+0, r, fg, bg);
-                tb_change_cell(lx+2, ly+0, r, fg, bg);
-                tb_change_cell(lx+3, ly+0, r, fg, bg);
-                tb_change_cell(lx+0, ly+1, r, fg, bg);
-                tb_change_cell(lx+1, ly+1, r, fg, bg);
-                tb_change_cell(lx+2, ly+1, r, fg, bg);
-                tb_change_cell(lx+3, ly+1, r, fg, bg);
-                lx += 4;
+
+void tb_print(const char *str, int x, int y, uint16_t fg, uint16_t bg)
+{
+    while (*str) {
+        uint32_t uni;
+        str += tb_utf8_char_to_unicode(&uni, str);
+        tb_change_cell(x, y, uni, fg, bg);
+        x++;
     }
-    lx = x;
-    ly = y;
-        for (int i = 0; i < n; i++) {
-                if (*current == i) {
-                        uint16_t fg = TB_RED | TB_BOLD;
-                        uint16_t bg = TB_DEFAULT;
-                        tb_change_cell(lx+0, ly+2, '^', fg, bg);
-                        tb_change_cell(lx+1, ly+2, '^', fg, bg);
-                        tb_change_cell(lx+2, ly+2, '^', fg, bg);
-                        tb_change_cell(lx+3, ly+2, '^', fg, bg);
-                }
-                lx += 4;
+}
+
+void tb_printf(int x, int y, uint16_t fg, uint16_t bg, const char *fmt, ...)
+{
+    char buf[4096];
+    va_list vl;
+    va_start(vl, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, vl);
+    va_end(vl);
+    tb_print(buf, x, y, fg, bg);
+}
+
+void draw_display(uint8_t *buffer) {
+    uint8_t offset_x = 1;
+    uint8_t offset_y = 1;
+
+    for (int line = 0; line < 16; ++line) {
+        for (int x = 0; x < 64; ++x) {
+            int y = line * 2;
+            int y2 = y + 1;
+            if (buffer[y*64+x] != 0 && buffer[y2*64+x] != 0) {
+                tb_change_cell(x + offset_x, line + offset_y, block_char[3], TB_BLUE, TB_BLACK);
+            } else if (buffer[y2*64+x] != 0) {
+                tb_change_cell(x + offset_x, line + offset_y, block_char[2], TB_BLUE, TB_BLACK);
+            } else if (buffer[y*64+x] != 0) {
+                tb_change_cell(x + offset_x, line + offset_y, block_char[1], TB_BLUE, TB_BLACK);
+            } else {
+                tb_change_cell(x + offset_x, line + offset_y, block_char[0], TB_BLUE, TB_BLACK);
+            }
         }
-}
-
-void runeAttrFunc(int i, uint32_t *r, uint16_t *fg, uint16_t *bg) {
-    *r = runes[i];
-    *fg = TB_DEFAULT;
-    *bg = TB_DEFAULT;
-}
-
-void colorAttrFunc(int i, uint32_t *r, uint16_t *fg, uint16_t *bg) {
-    *r = ' ';
-    *fg = TB_DEFAULT;
-    *bg = colors[i];
-}
-
-void updateAndRedrawAll(int mx, int my) {
-    tb_clear();
-    if (mx != -1 && my != -1) {
-        backbuf[bbw*my+mx].ch = runes[curRune];
-        backbuf[bbw*my+mx].fg = colors[curCol];
     }
-    memcpy(tb_cell_buffer(), backbuf, sizeof(struct tb_cell)*bbw*bbh);
-    int h = tb_height();
-    updateAndDrawButtons(&curRune, 0, 0, mx, my, len(runes), runeAttrFunc);
-    updateAndDrawButtons(&curCol, 0, h-3, mx, my, len(colors), colorAttrFunc);
+}
+
+void draw_keyboard() {
+
+}
+
+
+void draw_layout() {
+    uint8_t display_width = 64;
+    uint8_t display_height = 16;
+    const char *disp_title = "Display";
+    uint8_t disp_title_len = (uint8_t) strlen(disp_title);
+
+    const char *reg_pane_title = "Registers";
+    uint8_t reg_pane_title_len = (uint8_t) strlen(reg_pane_title);
+
+    tb_change_cell(0, 0, box_drawing[0], 0, 0);
+    tb_print(disp_title, 1, 0, 0, 0);
+    for (int x = disp_title_len+1; x < display_width + 1; ++x) {
+        tb_change_cell(x, 0, box_drawing[1], 0, 0);
+    }
+    tb_change_cell(display_width+1, 0, box_drawing[2], 0, 0);
+    tb_print(reg_pane_title, display_width+2, 0, 0, 0);
+    for (int x = display_width + 2 + reg_pane_title_len; x < tb_width()-1; ++x) {
+        tb_change_cell(x, 0, box_drawing[1], 0, 0);
+    }
+    tb_change_cell(tb_width()-1, 0, box_drawing[3], 0, 0);
+    for (int y = 1; y < display_height + 1; ++y) {
+        tb_change_cell(0, y, box_drawing[4], 0, 0);
+        tb_change_cell(display_width + 1, y, box_drawing[4], 0, 0);
+        tb_change_cell(tb_width()-1, y, box_drawing[4], 0, 0);
+    }
+    tb_change_cell(0, display_height+1, box_drawing[5], 0, 0);
+    for (int x = 1; x < display_width + 1; ++x) {
+        tb_change_cell(x, display_height+1, box_drawing[1], 0, 0);
+    }
+    tb_change_cell(display_width+1, display_height+1, box_drawing[6], 0, 0);
+    for (int x = display_width + 2; x < tb_width()-1; ++x) {
+        tb_change_cell(x, display_height+1, box_drawing[1], 0, 0);
+    }
+    tb_change_cell(tb_width()-1, display_height+1, box_drawing[7], 0, 0);
+
+}
+
+static uint8_t disp_buffer[64*32];
+
+void draw_all() {
+    draw_layout();
+    draw_display(disp_buffer);
     tb_present();
-}
-
-void reallocBackBuffer(int w, int h) {
-    bbw = w;
-    bbh = h;
-    if (backbuf)
-        free(backbuf);
-    backbuf = calloc(sizeof(struct tb_cell), w*h);
 }
 
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
-
-    int init_ok = tb_init();
-    if (init_ok < 0) {
-        fprintf(stderr, "termbox init failed, code: %d\n", init_ok);
-        return -1;
+    memset(disp_buffer, 0, 64*32);
+    disp_buffer[0] = 1;
+    disp_buffer[64] = 1;
+    disp_buffer[65] = 1;
+    int ret = tb_init();
+    if (ret) {
+        log_error("tb_init() failed with error code %d\n", ret);
+        return 1;
     }
+    draw_all();
 
-    tb_select_input_mode(TB_INPUT_ESC | TB_INPUT_MOUSE);
-    int w = tb_width();
-    int h = tb_height();
-    reallocBackBuffer(w, h);
-    updateAndRedrawAll(-1, -1);
-    for (;;) {
-        struct tb_event ev;
-        int mx = -1;
-        int my = -1;
-        int t = tb_poll_event(&ev);
-        if (t == -1) {
-            tb_shutdown();
-            fprintf(stderr, "termbox poll event error\n");
-            return -1;
-        }
-
-        switch (t) {
+    struct tb_event ev;
+    while (tb_poll_event(&ev)) {
+        switch (ev.type) {
         case TB_EVENT_KEY:
-            if (ev.key == TB_KEY_ESC) {
-                tb_shutdown();
-                return 0;
-            }
-            break;
-        case TB_EVENT_MOUSE:
-            if (ev.key == TB_KEY_MOUSE_LEFT) {
-                mx = ev.x;
-                my = ev.y;
+            switch (ev.key) {
+            case TB_KEY_ESC:
+                goto done;
+                break;
             }
             break;
         case TB_EVENT_RESIZE:
-            reallocBackBuffer(ev.w, ev.h);
+            draw_all();
             break;
         }
-        updateAndRedrawAll(mx, my);
     }
-
+done:
+    tb_shutdown();
     return 0;
 }

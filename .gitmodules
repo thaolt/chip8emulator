@@ -1,3 +1,6 @@
 [submodule "3rdparty/termbox/origin"]
 	path = 3rdparty/termbox/origin
 	url = https://github.com/nsf/termbox.git
+[submodule "3rdparty/log.c/origin"]
+	path = 3rdparty/log.c/origin
+	url = https://github.com/rxi/log.c.git

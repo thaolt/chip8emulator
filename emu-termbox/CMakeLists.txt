@@ -4,4 +4,4 @@ project(emu-termbox)
 
 add_executable(${PROJECT_NAME} "main.c")
 
-target_link_libraries(${PROJECT_NAME} chip8emu termbox)
+target_link_libraries(${PROJECT_NAME} chip8emu termbox logc)
