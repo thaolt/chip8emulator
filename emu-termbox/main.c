@@ -111,6 +111,7 @@ void draw_layout() {
 static uint8_t disp_buffer[64*32];
 
 void draw_all() {
+    tb_clear();
     draw_layout();
     draw_display(disp_buffer);
     tb_present();
@@ -122,6 +123,7 @@ int main(int argc, char **argv) {
     disp_buffer[0] = 1;
     disp_buffer[64] = 1;
     disp_buffer[65] = 1;
+    disp_buffer[64*32 - 1] = 1;
     int ret = tb_init();
     if (ret) {
         log_error("tb_init() failed with error code %d\n", ret);
