@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 project(chip8emulator)
 
 include_directories(${CMAKE_SOURCE_DIR}/libchip8emu)
+include_directories(${CMAKE_SOURCE_DIR}/3rdparty/termbox/origin/src)
 
 link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
