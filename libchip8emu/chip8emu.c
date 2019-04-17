@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
+#include "log.h"
 #include "chip8emu.h"
 
 static uint8_t chip8_fontset[80] =
@@ -234,7 +235,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
             }
             break;
         default:
-            printf ("Unknown opcode: 0x%X\n", emu->opcode);
+            log_error("Unknown opcode: 0x%X\n", emu->opcode);
         }
         break;
     case 0xF000:
@@ -286,7 +287,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
             emu->pc += 2;
             break;
         default:
-            printf ("Unknown opcode: 0x%X\n", emu->opcode);
+            log_error("Unknown opcode: 0x%X\n", emu->opcode);
         }
         break;
 
