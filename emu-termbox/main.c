@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <pthread.h>
+#include <time.h>
 
 #include "termbox.h"
 #include "log.h"
@@ -10,7 +10,7 @@
 #include "tinycthread.h"
 
 #define DISPLAY_WIDTH   64
-#define DISPLAY_HEIGHT  16
+#define DISPLAY_HEIGHT  16 /* x 2 */
 
 static const uint32_t box_drawing[] = {
     0x250C, /* ┌ */
@@ -130,10 +130,63 @@ void draw_all(chip8emu* emu) {
     tb_present();
 }
 
+static bool draw_flag = false;
+static cnd_t draw_cnd;
+static mtx_t draw_mtx;
+static mtx_t key_mtx;
+
+int emulator_thread(void* arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    clock_t start_clk = clock();
+    clock_t elapsed_clk;
+    for (;;) {
+        elapsed_clk = clock() - start_clk;
+        if (elapsed_clk >= (CLOCKS_PER_SEC/100)) { /* 100Hz */
+            chip8emu_exec_cycle(emu);
+            draw_registers(emu);
+            tb_present();
+            start_clk = clock();
+        }
+    }
+}
+
+void draw_callback(uint8_t *buf) {
+    (void)buf;
+    mtx_lock(&draw_mtx);
+    draw_flag = true;
+    cnd_signal(&draw_cnd);
+    mtx_unlock(&draw_mtx);
+}
+
+int display_draw_thread(void *arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    for (;;) {
+        mtx_lock(&draw_mtx);
+        cnd_wait(&draw_cnd, &draw_mtx);
+        draw_display(emu->gfx);
+        draw_flag = false;
+        mtx_unlock(&draw_mtx);
+    }
+}
+
+int timer_tick_thread(void *arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    clock_t start_clk = clock();
+    clock_t elapsed_clk;
+    for (;;) {
+        elapsed_clk = clock() - start_clk;
+        if (elapsed_clk >= (CLOCKS_PER_SEC/60)) { /* 60Hz */
+            chip8emu_timer_tick(emu);
+            start_clk = clock();
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     (void)argc; (void)argv; /* unused variables */
 
     chip8emu *emu = chip8emu_new();
+    emu->draw = &draw_callback;
     emu->beep = &beep;
 
     int ret = tb_init();
@@ -142,33 +195,52 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/chip8emulator/roms/UFO");
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/INVADERS");
 
     draw_all(emu);
 
+    thrd_t thrd_emu;
+    thrd_t thrd_timer;
+    thrd_t thrd_draw;
+
+    if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
+        log_error("Cannot create draw thread!");
+        goto quit;
+    }
+
+    if (thrd_create(&thrd_emu, emulator_thread, (void*)emu) != thrd_success) {
+        log_error("Cannot create emulator thread!");
+        goto quit;
+    }
+
+    if (thrd_create(&thrd_timer, timer_tick_thread, (void*)emu) != thrd_success) {
+        log_error("Cannot create timer thread!");
+        goto quit;
+    }
+
     struct tb_event ev;
-    while (true) {
-        tb_peek_event(&ev, 1);
-        chip8emu_exec_cycle(emu);
-        draw_registers(emu);
-        if (emu->draw_flag) {
-            draw_display(emu->gfx);
-            emu->draw_flag = false;
-        }
+
+    while (tb_poll_event(&ev)) {
         switch (ev.type) {
         case TB_EVENT_KEY:
+
             switch (ev.key) {
             case TB_KEY_ESC:
-                goto done;
+                goto quit;
                 break;
+            default:
+                log_error("key = %c", ev.ch);
             }
             break;
         case TB_EVENT_RESIZE:
+            mtx_lock(&draw_mtx);
             draw_all(emu);
+            mtx_unlock(&draw_mtx);
             break;
         }
     }
-done:
+
+quit:
     tb_shutdown();
     return 0;
 }

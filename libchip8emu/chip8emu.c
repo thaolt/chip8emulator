@@ -47,7 +47,7 @@ chip8emu *chip8emu_new(void)
     emu->delay_timer = 0;
     emu->sound_timer = 0;
 
-    emu->draw_flag = false;
+    emu->draw = 0;
     emu->beep = 0;
 
     return emu;
@@ -68,7 +68,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
         case 0x00E0: /* clear screen */
             memset(emu->gfx, 0, 64*32);
             emu->pc += 2;
-            emu->draw_flag = true;
+            emu->draw(emu->gfx);
             break;
 
         case 0x00EE: /* subroutine return */
@@ -208,7 +208,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
             }
         }
 
-        emu->draw_flag = true;
+        emu->draw(emu->gfx);
         emu->pc += 2;
         break;
     }
@@ -286,16 +286,6 @@ void chip8emu_exec_cycle(chip8emu *emu)
         break;
 
     }
-
-    // Update timers
-    if(emu->delay_timer > 0)
-        --emu->delay_timer;
-
-    if(emu->sound_timer > 0) {
-        if(emu->sound_timer == 1)
-            emu->beep();
-        --emu->sound_timer;
-    }
 }
 
 
@@ -324,4 +314,16 @@ int chip8emu_load_rom(chip8emu *emu, const char *filename)
     fclose(fileptr);
 
     return chip8emu_load_code(emu, code_buffer, filelen + 1);
+}
+
+void chip8emu_timer_tick(chip8emu *emu)
+{
+    if(emu->delay_timer > 0)
+        --emu->delay_timer;
+
+    if(emu->sound_timer > 0) {
+        if(emu->sound_timer == 1)
+            emu->beep();
+        --emu->sound_timer;
+    }
 }

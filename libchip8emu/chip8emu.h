@@ -25,9 +25,9 @@ struct chip8emu
     uint16_t  sp;           /* stack pointer */
 
     uint8_t   key[16];
-    bool draw_flag;
-    void (*beep)();
 
+    void (*draw)(uint8_t *);
+    void (*beep)();
 };
 
 chip8emu* chip8emu_new(void);
@@ -35,6 +35,7 @@ void chip8emu_free(chip8emu*);
 int chip8emu_load_code(chip8emu *emu, uint8_t* code, long code_size);
 int chip8emu_load_rom(chip8emu* emu, const char* filename);
 void chip8emu_exec_cycle(chip8emu *emu);
+void chip8emu_timer_tick(chip8emu *emu);
 
 
 #endif /* CHIP8EMU_H_ */
