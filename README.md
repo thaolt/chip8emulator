@@ -15,3 +15,6 @@ cd emu-termbox
 ./emu-termbox
 ```
 
+## Screencast
+
+[![asciicast](https://asciinema.org/a/241423.svg)](https://asciinema.org/a/241423)
