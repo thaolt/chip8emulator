@@ -127,10 +127,10 @@ void draw_all(chip8emu* emu) {
     tb_clear();
     draw_layout();
     draw_display(emu->gfx);
+    draw_registers(emu);
     tb_present();
 }
 
-static bool draw_flag = false;
 static cnd_t draw_cnd;
 static mtx_t draw_mtx;
 static mtx_t key_mtx;
@@ -142,10 +142,12 @@ int emulator_thread(void* arg) {
     for (;;) {
         elapsed_clk = clock() - start_clk;
         if (elapsed_clk >= (CLOCKS_PER_SEC/100)) { /* 100Hz */
-            chip8emu_exec_cycle(emu);
-            draw_registers(emu);
-            tb_present();
             start_clk = clock();
+            mtx_lock(&key_mtx);
+            chip8emu_exec_cycle(emu);
+            mtx_unlock(&key_mtx);
+            draw_registers(emu);
+            tb_present();            
         }
     }
 }
@@ -153,7 +155,6 @@ int emulator_thread(void* arg) {
 void draw_callback(uint8_t *buf) {
     (void)buf;
     mtx_lock(&draw_mtx);
-    draw_flag = true;
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
@@ -164,7 +165,6 @@ int display_draw_thread(void *arg) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
         draw_display(emu->gfx);
-        draw_flag = false;
         mtx_unlock(&draw_mtx);
     }
 }
@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/INVADERS");
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/UFO");
 
     draw_all(emu);
 
@@ -220,16 +220,71 @@ int main(int argc, char **argv) {
 
     struct tb_event ev;
 
-    while (tb_poll_event(&ev)) {
+    while (true) {
+        tb_peek_event(&ev, 50);
         switch (ev.type) {
         case TB_EVENT_KEY:
-
             switch (ev.key) {
             case TB_KEY_ESC:
                 goto quit;
                 break;
+            case TB_KEY_ENTER:
+                mtx_lock(&key_mtx);
+                emu->key[0xA] = 1;
+                mtx_unlock(&key_mtx);
+                break;
             default:
-                log_error("key = %c", ev.ch);
+                mtx_lock(&key_mtx);
+                switch (ev.ch) {
+                case '0':
+                    emu->key[0x0] = 1;
+                    break;
+                case '1':
+                    emu->key[0x1] = 1;
+                    break;
+                case '2':
+                    emu->key[0x2] = 1;
+                    break;
+                case '3':
+                    emu->key[0x3] = 1;
+                    break;
+                case '4':
+                    emu->key[0x4] = 1;
+                    break;
+                case '5':
+                    emu->key[0x5] = 1;
+                    break;
+                case '6':
+                    emu->key[0x6] = 1;
+                    break;
+                case '7':
+                    emu->key[0x7] = 1;
+                    break;
+                case '8':
+                    emu->key[0x8] = 1;
+                    break;
+                case '9':
+                    emu->key[0x9] = 1;
+                    break;
+                case '+':
+                    emu->key[0xB] = 1;
+                    break;
+                case '-':
+                    emu->key[0xC] = 1;
+                    break;
+                case '*':
+                    emu->key[0xD] = 1;
+                    break;
+                case '/':
+                    emu->key[0xE] = 1;
+                    break;
+                case '.':
+                    emu->key[0xF] = 1;
+                    break;
+                default:
+                    memset(emu->key, 0, 16);
+                }
+                mtx_unlock(&key_mtx);
             }
             break;
         case TB_EVENT_RESIZE:
