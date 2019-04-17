@@ -119,19 +119,19 @@ void chip8emu_exec_cycle(chip8emu *emu)
     case 0x8000:
         switch (emu->opcode & 0x000F) {
         case 0x0000: /* 8XY0: Vx = Vy  */
-            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x0F00) >> 4];
+            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x00F0) >> 4];
             emu->pc += 2;
             break;
         case 0x0001: /* 8XY1: Vx = Vx | Vy */
-            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x0F00) >> 8] | emu->V[(emu->opcode & 0x00F0) >> 4];
+            emu->V[(emu->opcode & 0x0F00) >> 8] |= emu->V[(emu->opcode & 0x00F0) >> 4];
             emu->pc += 2;
             break;
         case 0x0002: /* 8XY2: Vx = Vx & Vy*/
-            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x0F00) >> 8] & emu->V[(emu->opcode & 0x00F0) >> 4];
+            emu->V[(emu->opcode & 0x0F00) >> 8] &= emu->V[(emu->opcode & 0x00F0) >> 4];
             emu->pc += 2;
             break;
         case 0x0003: /* 8XY3: Vx = Vx XOR Vy */
-            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x0F00) >> 8] ^ emu->V[(emu->opcode & 0x00F0) >> 4];
+            emu->V[(emu->opcode & 0x0F00) >> 8] ^= emu->V[(emu->opcode & 0x00F0) >> 4];
             emu->pc += 2;
             break;
         case 0x0004: /* 8XY4: Vx += Vy; Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't */
@@ -143,31 +143,31 @@ void chip8emu_exec_cycle(chip8emu *emu)
             emu->pc += 2;
             break;
         case 0x0005: /* 8XY5: Vx -= Vy; VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't */
-            if (((int)emu->V[(emu->opcode & 0x0F00) >> 8 ] - (int)emu->V[(emu->opcode & 0x00F0) >> 4]) >= 0) {
-                emu->V[0xF] = 1;
+            if (emu->V[(emu->opcode & 0x00F0) >> 4] > emu->V[(emu->opcode & 0x0F00) >> 8]) {
+                emu->V[0xF] = 0;
             } else {
-                emu->V[0xF] &= 0;
+                emu->V[0xF] = 1;
             }
             emu->V[(emu->opcode & 0x0F00) >> 8] += emu->V[(emu->opcode & 0x00F0) >> 4];
             emu->pc += 2;
             break;
         case 0x0006: /* 8XY6: Vx>>=1; Stores the least significant bit of VX in VF and then shifts VX to the right by 1 */
-            emu->V[0xF] = emu->V[(emu->opcode & 0x0F00) >> 8] & 7;
-            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x0F00) >> 8] >> 1;
+            emu->V[0xF] = emu->V[(emu->opcode & 0x0F00) >> 8] & 0x1;
+            emu->V[(emu->opcode & 0x0F00) >> 8] >>= 1;
             emu->pc += 2;
             break;
         case 0x0007: /* 8XY7: Vx=Vy-Vx; Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't */
-            if (((int)emu->V[(emu->opcode & 0x0F00) >> 8] - (int)emu->V[(emu->opcode & 0x00F0) >> 4]) > 0) {
-                emu->V[0xF] = 1;
+            if (emu->V[(emu->opcode & 0x0F00) >> 8] > (int)emu->V[(emu->opcode & 0x00F0) >> 4]) {
+                emu->V[0xF] = 0;
             } else {
-                emu->V[0xF] &= 0;
+                emu->V[0xF] = 1;
             }
             emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x00F0) >> 4] - emu->V[(emu->opcode & 0x0F00) >> 8];
             emu->pc += 2;
             break;
         case 0x000E: /* 8XYE: Vx<<=1; Stores the most significant bit of VX in VF and then shifts VX to the left by 1 */
             emu->V[0xF] = emu->V[(emu->opcode & 0x0F00) >> 8] >> 7;
-            emu->V[(emu->opcode & 0x0F00) >> 8] = emu->V[(emu->opcode & 0x0F00) >> 8] << 1;
+            emu->V[(emu->opcode & 0x0F00) >> 8] <<= 1;
             emu->pc += 2;
             break;
         }
@@ -187,7 +187,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
         emu->pc = (emu->opcode & 0x0FFF) + emu->V[0];
         break;
     case 0xC000: /* CXNN: Vx=rand() & NN */
-        emu->V[(emu->opcode & 0x0F00) >> 8] = rand() & (emu->opcode & 0x00FF);
+        emu->V[(emu->opcode & 0x0F00) >> 8] = (rand() % (0xFF + 1)) & (emu->opcode & 0x00FF);
         emu->pc += 2;
         break;
     case 0xD000: { /* DXYN: draw(Vx,Vy,N); draw at X,Y width 8, height N sprite from I register */
@@ -265,19 +265,22 @@ void chip8emu_exec_cycle(chip8emu *emu)
         case 0x0033: /* FX33: */
             emu->memory[emu->I]     = emu->V[(emu->opcode & 0x0F00) >> 8] / 100;
             emu->memory[emu->I + 1] = (emu->V[(emu->opcode & 0x0F00) >> 8] / 10) % 10;
-            emu->memory[emu->I + 2] = (emu->V[(emu->opcode & 0x0F00) >> 8] % 100) % 10;
+            emu->memory[emu->I + 2] = emu->V[(emu->opcode & 0x0F00) >> 8] % 10;
             emu->pc += 2;
             break;
         case 0x0055: /* FX55: */
             for (int i = 0; i <= ((emu->opcode & 0x0F00) >> 8); i++) {
                 emu->memory[emu->I+i] = emu->V[i];
             }
+
+            emu->I += ((emu->opcode & 0x0F00) >> 8) + 1;
             emu->pc += 2;
             break;
         case 0x0065: /* FX65: */
             for (int i = 0; i <= ((emu->opcode & 0x0F00) >> 8); i++) {
                 emu->V[i] = emu->memory[emu->I + i];
             }
+            emu->I += ((emu->opcode & 0x0F00) >> 8) + 1;
             emu->pc += 2;
             break;
         default:

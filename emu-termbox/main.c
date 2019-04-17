@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/UFO");
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
 
     draw_all(emu);
 
@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
     struct tb_event ev;
 
     while (true) {
-        tb_peek_event(&ev, 50);
+        tb_peek_event(&ev, 30);
         switch (ev.type) {
         case TB_EVENT_KEY:
             switch (ev.key) {
