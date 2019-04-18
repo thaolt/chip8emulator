@@ -12,6 +12,9 @@
 #define DISPLAY_WIDTH   64
 #define DISPLAY_HEIGHT  16 /* x 2 */
 
+#define DISP_FG TB_CYAN
+#define DISP_BG TB_BLACK
+
 static const uint32_t box_drawing[] = {
     0x250C, /* ┌ */
     0x2500, /* ─ */
@@ -29,6 +32,16 @@ static const uint32_t block_char[] = {
     0x2584, /* ▄ */
     0x2588, /* █ */
 };
+
+static mtx_t draw_mtx;
+static mtx_t timer_mtx;
+static mtx_t emu_cycle_mtx;
+
+static cnd_t draw_cnd;
+static cnd_t clk_timer_cnd;
+static cnd_t clk_emu_cnd;
+
+static uint8_t keybuffer[0x10] = {0};
 
 void tb_print(const char *str, int x, int y, uint16_t fg, uint16_t bg)
 {
@@ -59,13 +72,13 @@ void draw_display(uint8_t *buffer) {
             int y = line * 2;
             int y2 = y + 1;
             if (buffer[y*64+x] != 0 && buffer[y2*64+x] != 0) {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[3], TB_BLUE, TB_BLACK);
+                tb_change_cell(x + offset_x, line + offset_y, block_char[3], DISP_FG, DISP_BG);
             } else if (buffer[y2*64+x] != 0) {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[2], TB_BLUE, TB_BLACK);
+                tb_change_cell(x + offset_x, line + offset_y, block_char[2], DISP_FG, DISP_BG);
             } else if (buffer[y*64+x] != 0) {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[1], TB_BLUE, TB_BLACK);
+                tb_change_cell(x + offset_x, line + offset_y, block_char[1], DISP_FG, DISP_BG);
             } else {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[0], TB_BLUE, TB_BLACK);
+                tb_change_cell(x + offset_x, line + offset_y, block_char[0], DISP_FG, DISP_BG);
             }
         }
     }
@@ -130,15 +143,6 @@ void draw_all(chip8emu* emu) {
     tb_present();
 }
 
-static mtx_t draw_mtx;
-static mtx_t timer_mtx;
-static mtx_t emu_cycle_mtx;
-
-static cnd_t draw_cnd;
-static cnd_t clk_timer_cnd;
-static cnd_t clk_emu_cnd;
-
-
 int emulator_thread(void* arg) {
     chip8emu * emu = (chip8emu*) arg;
     while (true) {
@@ -151,12 +155,7 @@ int emulator_thread(void* arg) {
 
 void draw_callback(chip8emu *emu) {
     (void)emu;
-    mtx_lock(&draw_mtx);
-    cnd_signal(&draw_cnd);
-    mtx_unlock(&draw_mtx);
 }
-
-static uint8_t keybuffer[0x10] = {0};
 
 bool keystate_callback(uint8_t key) {
     bool ret;
@@ -168,23 +167,26 @@ bool keystate_callback(uint8_t key) {
 
 int display_draw_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
-    int ret = tb_init();
-    if (ret) {
-        log_error("tb_init() failed with error code %d\n", ret);
-        return 1;
-    }
 
     draw_all(emu);
+
+    uint8_t counter = 0;
+
     while (true) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
-        draw_display(emu->gfx);
-        draw_registers(emu);
-        tb_present();
+
+        counter++;
+        if (counter == 2) {
+            draw_display(emu->gfx);
+            draw_registers(emu);
+            tb_present();
+            counter = 0;
+        }
+
         mtx_unlock(&draw_mtx);
     }
 
-    tb_shutdown();
 }
 
 int timer_tick_thread(void *arg) {
@@ -283,11 +285,20 @@ int clk_emu_cycle_thread(void *arg) {
     while (true) {
         thrd_sleep(&delay, 0);
         cnd_signal(&clk_emu_cnd);
+        mtx_lock(&draw_mtx);
+        cnd_signal(&draw_cnd);
+        mtx_unlock(&draw_mtx);
     }
 }
 
 int main(int argc, char **argv) {
     (void)argc; (void)argv; /* unused variables */
+
+    int ret = tb_init();
+    if (ret) {
+        log_error("tb_init() failed with error code %d\n", ret);
+        return 1;
+    }
 
     chip8emu *emu = chip8emu_new();
     emu->draw = &draw_callback;
@@ -300,6 +311,8 @@ int main(int argc, char **argv) {
     thrd_t thrd_timer;
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
+
+    /* clock threads */
     thrd_t thrd_timer_clk;
     thrd_t thrd_emu_cycle_clk;
 
@@ -336,5 +349,6 @@ int main(int argc, char **argv) {
     thrd_join(thrd_keypad, NULL);
 
 quit:
+    tb_shutdown();
     return 0;
 }
