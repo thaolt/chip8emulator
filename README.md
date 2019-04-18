@@ -30,3 +30,18 @@ cd frontends/chip8emu-termbox
 ## Screencasts
 
 [![asciicast](https://asciinema.org/a/241423.svg)](https://asciinema.org/a/241423)
+
+## Credits
+
+### Libraries Used
+
+* Termbox: https://github.com/nsf/termbox
+* TinyCThread: https://github.com/tinycthread/tinycthread
+* log.c: https://github.com/rxi/log.c
+
+### Other resources
+
+Thanks to authors of the articles which help me writing this library
+
+* http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
+* http://en.wikipedia.org/wiki/CHIP-8
