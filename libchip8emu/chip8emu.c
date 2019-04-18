@@ -243,6 +243,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
                 if (emu->keystate(i)) {
                     emu->V[(emu->opcode & 0x0F00) >> 8] = i;
                     emu->pc += 2;
+                    break;
                 }
             }
             break;
@@ -287,7 +288,6 @@ void chip8emu_exec_cycle(chip8emu *emu)
             log_error("Unknown opcode: 0x%X\n", emu->opcode);
         }
         break;
-
     }
 }
 

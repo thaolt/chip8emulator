@@ -130,20 +130,22 @@ void draw_all(chip8emu* emu) {
     tb_present();
 }
 
-static cnd_t draw_cnd;
 static mtx_t draw_mtx;
+static mtx_t timer_mtx;
+static mtx_t emu_cycle_mtx;
+
+static cnd_t draw_cnd;
+static cnd_t clk_timer_cnd;
+static cnd_t clk_emu_cnd;
+
 
 int emulator_thread(void* arg) {
     chip8emu * emu = (chip8emu*) arg;
-    clock_t start_clk = clock();
-    clock_t elapsed_clk;
-    for (;;) {
-        elapsed_clk = clock() - start_clk;
-        if (elapsed_clk >= (CLOCKS_PER_SEC/500)) {
-            start_clk = clock();
-            chip8emu_exec_cycle(emu);
-            draw_registers(emu);
-        }
+    while (true) {
+        mtx_lock(&emu_cycle_mtx);
+        cnd_wait(&clk_emu_cnd, &emu_cycle_mtx);
+        chip8emu_exec_cycle(emu);
+        mtx_unlock(&emu_cycle_mtx);
     }
 }
 
@@ -158,6 +160,7 @@ static uint8_t keybuffer[0x10] = {0};
 
 bool keystate_callback(uint8_t key) {
     bool ret;
+    if (keybuffer[key] > 3) keybuffer[key] = 3;
     ret = keybuffer[key] > 0;
     if (ret) keybuffer[key]--;
     return ret;
@@ -165,31 +168,32 @@ bool keystate_callback(uint8_t key) {
 
 int display_draw_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
-    clock_t start_clk = clock();
-    clock_t elapsed_clk;
-    for (;;) {
-        elapsed_clk = clock() - start_clk;
-        if (elapsed_clk >= (CLOCKS_PER_SEC/24)) {
-            start_clk = clock();
-//            mtx_lock(&draw_mtx);
-//            cnd_wait(&draw_cnd, &draw_mtx);
-            draw_display(emu->gfx);
-            tb_present();
-//            mtx_unlock(&draw_mtx);
-        }
+    int ret = tb_init();
+    if (ret) {
+        log_error("tb_init() failed with error code %d\n", ret);
+        return 1;
     }
+
+    draw_all(emu);
+    while (true) {
+        mtx_lock(&draw_mtx);
+        cnd_wait(&draw_cnd, &draw_mtx);
+        draw_display(emu->gfx);
+        draw_registers(emu);
+        tb_present();
+        mtx_unlock(&draw_mtx);
+    }
+
+    tb_shutdown();
 }
 
 int timer_tick_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
-    clock_t start_clk = clock();
-    clock_t elapsed_clk;
-    for (;;) {
-        elapsed_clk = clock() - start_clk;
-        if (elapsed_clk >= (CLOCKS_PER_SEC/20)) {
-            start_clk = clock();
-            chip8emu_timer_tick(emu);
-        }
+    while (true) {
+        mtx_lock(&timer_mtx);
+        cnd_wait(&clk_timer_cnd, &timer_mtx);
+        chip8emu_timer_tick(emu);
+        mtx_unlock(&timer_mtx);
     }
 }
 
@@ -197,7 +201,12 @@ int keypad_thread(void *arg) {
     (void)arg;
     bool quit = false;
     int c = getchar();
+    struct timespec delay = {
+        .tv_sec = 0,
+        .tv_nsec = 10000000
+    };
     while (!quit) {
+        thrd_sleep(&delay, 0);
         switch (c) {
         case '0':
             keybuffer[0x0]++;
@@ -253,6 +262,30 @@ int keypad_thread(void *arg) {
     return 0;
 }
 
+int clk_timer_thread(void *arg) {
+    (void)arg;
+    struct timespec delay = {
+        .tv_sec = 0,
+        .tv_nsec = 16666666
+    };
+    while (true) {
+        thrd_sleep(&delay, 0);
+        cnd_signal(&clk_timer_cnd);
+    }
+}
+
+int clk_emu_cycle_thread(void *arg) {
+    (void)arg;
+    struct timespec delay = {
+        .tv_sec = 0,
+        .tv_nsec = 1000000
+    };
+    while (true) {
+        thrd_sleep(&delay, 0);
+        cnd_signal(&clk_emu_cnd);
+    }
+}
+
 int main(int argc, char **argv) {
     (void)argc; (void)argv; /* unused variables */
 
@@ -261,20 +294,24 @@ int main(int argc, char **argv) {
     emu->keystate= &keystate_callback;
     emu->beep = &beep;
 
-    int ret = tb_init();
-    if (ret) {
-        log_error("tb_init() failed with error code %d\n", ret);
-        return 1;
-    }
-
     chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-
-    draw_all(emu);
 
     thrd_t thrd_emu;
     thrd_t thrd_timer;
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
+    thrd_t thrd_timer_clk;
+    thrd_t thrd_emu_cycle_clk;
+
+    if (thrd_create(&thrd_timer_clk, clk_timer_thread, (void*)0) != thrd_success) {
+        log_error("Cannot create timer clock thread!");
+        goto quit;
+    }
+
+    if (thrd_create(&thrd_emu_cycle_clk, clk_emu_cycle_thread, (void*)0) != thrd_success) {
+        log_error("Cannot create emu cycle timer clock thread!");
+        goto quit;
+    }
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
         log_error("Cannot create draw thread!");
@@ -299,6 +336,5 @@ int main(int argc, char **argv) {
     thrd_join(thrd_keypad, NULL);
 
 quit:
-    tb_shutdown();
     return 0;
 }
