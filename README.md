@@ -1,8 +1,14 @@
 # chip8emu
 
+A C99 implementation of CHIP8 emu
+lation library
+
 ## Requirements
 
-## Installation
+* C/C++ compilier
+* CMake
+
+## Quick started
 
 ```
 git clone https://github.com/thaolt/chip8emulator.git
