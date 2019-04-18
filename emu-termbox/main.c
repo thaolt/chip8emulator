@@ -139,11 +139,11 @@ int emulator_thread(void* arg) {
     clock_t elapsed_clk;
     for (;;) {
         elapsed_clk = clock() - start_clk;
-        if (elapsed_clk >= (CLOCKS_PER_SEC/100)) { /* 100Hz */
+        if (elapsed_clk >= (CLOCKS_PER_SEC/60)) { /* 60Hz */
             start_clk = clock();
             chip8emu_exec_cycle(emu);
             draw_registers(emu);
-            tb_present();            
+            tb_present();
         }
     }
 }
@@ -187,6 +187,65 @@ int timer_tick_thread(void *arg) {
     }
 }
 
+int keypad_thread(void *arg) {
+    (void)arg;
+    bool quit = false;
+    int c = getchar();
+    while (!quit) {
+        switch (c) {
+        case '0':
+            keybuffer[0x0]++;
+            break;
+        case '1':
+            keybuffer[0x1]++;
+            break;
+        case '2':
+            keybuffer[0x2]++;
+            break;
+        case '3':
+            keybuffer[0x3]++;
+            break;
+        case '4':
+            keybuffer[0x4]++;
+            break;
+        case '5':
+            keybuffer[0x5]++;
+            break;
+        case '6':
+            keybuffer[0x6]++;
+            break;
+        case '7':
+            keybuffer[0x7]++;
+            break;
+        case '8':
+            keybuffer[0x8]++;
+            break;
+        case '9':
+            keybuffer[0x9]++;
+            break;
+        case '+':
+            keybuffer[0xB]++;
+            break;
+        case '-':
+            keybuffer[0xC]++;
+            break;
+        case '*':
+            keybuffer[0xD]++;
+            break;
+        case '/':
+            keybuffer[0xE]++;
+            break;
+        case '.':
+            keybuffer[0xF]++;
+            break;
+        case 'q':
+            quit = true;
+            break;
+        }
+        c = getchar();
+    }
+}
+
 int main(int argc, char **argv) {
     (void)argc; (void)argv; /* unused variables */
 
@@ -201,13 +260,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/UFO");
 
     draw_all(emu);
 
     thrd_t thrd_emu;
     thrd_t thrd_timer;
     thrd_t thrd_draw;
+    thrd_t thrd_keypad;
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
         log_error("Cannot create draw thread!");
@@ -224,75 +284,12 @@ int main(int argc, char **argv) {
         goto quit;
     }
 
-    struct tb_event ev;
-
-    while (tb_poll_event(&ev)) {
-        switch (ev.type) {
-        case TB_EVENT_KEY:
-            switch (ev.key) {
-            case TB_KEY_ESC:
-                goto quit;
-                break;
-            case TB_KEY_ENTER:
-                keybuffer[0xA]++;
-                break;
-            default:
-                switch (ev.ch) {
-                case '0':
-                    keybuffer[0x0]++;
-                    break;
-                case '1':
-                    keybuffer[0x1]++;
-                    break;
-                case '2':
-                    keybuffer[0x2]++;
-                    break;
-                case '3':
-                    keybuffer[0x3]++;
-                    break;
-                case '4':
-                    keybuffer[0x4]++;
-                    break;
-                case '5':
-                    keybuffer[0x5]++;
-                    break;
-                case '6':
-                    keybuffer[0x6]++;
-                    break;
-                case '7':
-                    keybuffer[0x7]++;
-                    break;
-                case '8':
-                    keybuffer[0x8]++;
-                    break;
-                case '9':
-                    keybuffer[0x9]++;
-                    break;
-                case '+':
-                    keybuffer[0xB]++;
-                    break;
-                case '-':
-                    keybuffer[0xC]++;
-                    break;
-                case '*':
-                    keybuffer[0xD]++;
-                    break;
-                case '/':
-                    keybuffer[0xE]++;
-                    break;
-                case '.':
-                    keybuffer[0xF]++;
-                    break;
-                }
-            }
-            break;
-        case TB_EVENT_RESIZE:
-            mtx_lock(&draw_mtx);
-            draw_all(emu);
-            mtx_unlock(&draw_mtx);
-            break;
-        }
+    if (thrd_create(&thrd_keypad, keypad_thread, (void*)0) != thrd_success) {
+        log_error("Cannot create keypad thread!");
+        goto quit;
     }
+
+    thrd_join(thrd_keypad, NULL);
 
 quit:
     tb_shutdown();
