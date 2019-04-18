@@ -1,7 +1,6 @@
 # chip8emu
 
-A C99 implementation of CHIP8 emu
-lation library
+A C99 implementation of CHIP8 emulation library
 
 ## Requirements
 
