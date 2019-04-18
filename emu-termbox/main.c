@@ -139,17 +139,16 @@ int emulator_thread(void* arg) {
     clock_t elapsed_clk;
     for (;;) {
         elapsed_clk = clock() - start_clk;
-        if (elapsed_clk >= (CLOCKS_PER_SEC/60)) { /* 60Hz */
+        if (elapsed_clk >= (CLOCKS_PER_SEC/500)) {
             start_clk = clock();
             chip8emu_exec_cycle(emu);
             draw_registers(emu);
-            tb_present();
         }
     }
 }
 
-void draw_callback(uint8_t *buf) {
-    (void)buf;
+void draw_callback(chip8emu *emu) {
+    (void)emu;
     mtx_lock(&draw_mtx);
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
@@ -166,11 +165,18 @@ bool keystate_callback(uint8_t key) {
 
 int display_draw_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
+    clock_t start_clk = clock();
+    clock_t elapsed_clk;
     for (;;) {
-        mtx_lock(&draw_mtx);
-        cnd_wait(&draw_cnd, &draw_mtx);
-        draw_display(emu->gfx);
-        mtx_unlock(&draw_mtx);
+        elapsed_clk = clock() - start_clk;
+        if (elapsed_clk >= (CLOCKS_PER_SEC/24)) {
+            start_clk = clock();
+//            mtx_lock(&draw_mtx);
+//            cnd_wait(&draw_cnd, &draw_mtx);
+            draw_display(emu->gfx);
+            tb_present();
+//            mtx_unlock(&draw_mtx);
+        }
     }
 }
 
@@ -180,9 +186,9 @@ int timer_tick_thread(void *arg) {
     clock_t elapsed_clk;
     for (;;) {
         elapsed_clk = clock() - start_clk;
-        if (elapsed_clk >= (CLOCKS_PER_SEC/60)) { /* 60Hz */
-            chip8emu_timer_tick(emu);
+        if (elapsed_clk >= (CLOCKS_PER_SEC/20)) {
             start_clk = clock();
+            chip8emu_timer_tick(emu);
         }
     }
 }
@@ -244,6 +250,7 @@ int keypad_thread(void *arg) {
         }
         c = getchar();
     }
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -260,7 +267,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/UFO");
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
 
     draw_all(emu);
 

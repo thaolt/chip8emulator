@@ -68,7 +68,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
         case 0x00E0: /* clear screen */
             memset(emu->gfx, 0, 64*32);
             emu->pc += 2;
-            emu->draw(emu->gfx);
+            emu->draw(emu);
             break;
 
         case 0x00EE: /* subroutine return */
@@ -208,7 +208,7 @@ void chip8emu_exec_cycle(chip8emu *emu)
             }
         }
 
-        emu->draw(emu->gfx);
+        emu->draw(emu);
         emu->pc += 2;
         break;
     }

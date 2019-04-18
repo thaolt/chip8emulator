@@ -24,7 +24,7 @@ struct chip8emu
     uint16_t  stack[16];
     uint16_t  sp;           /* stack pointer */
 
-    void (*draw)(uint8_t *);
+    void (*draw)(chip8emu *);
     bool (*keystate)(uint8_t);
     void (*beep)();
 };
