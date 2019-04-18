@@ -7,3 +7,6 @@
 [submodule "3rdparty/tinycthread"]
 	path = 3rdparty/tinycthread
 	url = https://github.com/tinycthread/tinycthread.git
+[submodule "3rdparty/libsoundio"]
+	path = 3rdparty/libsoundio
+	url = https://github.com/andrewrk/libsoundio.git
