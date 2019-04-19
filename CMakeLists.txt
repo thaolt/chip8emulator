@@ -11,8 +11,6 @@ include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/src)
 
 link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
-add_definitions(-DCHIP8EMU_USED_THREAD)
-
 add_subdirectory(3rdparty)
 add_subdirectory(libchip8emu)
 add_subdirectory(frontends)

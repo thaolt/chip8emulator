@@ -238,6 +238,12 @@ int keypad_thread(void *arg) {
         case '[':
             chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
             break;
+        case 'p':
+            if (emu->paused)
+                chip8emu_resume(emu);
+            else
+                chip8emu_pause(emu);
+            break;
         }
         c = getchar();
     }
