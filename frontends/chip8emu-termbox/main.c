@@ -279,6 +279,7 @@ int main(int argc, char **argv) {
     }
 
     chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_set_cpu_speed(emu,1000);
     chip8emu_start(emu);
 
     thrd_join(thrd_keypad, NULL);
