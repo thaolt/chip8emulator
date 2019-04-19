@@ -31,6 +31,10 @@ cd dist/
 
 [![asciicast](https://asciinema.org/a/241423.svg)](https://asciinema.org/a/241423)
 
+## Screenshots
+
+![sdl_basic_frontend](docs/img/sdl_basic_front_end.png)
+
 ## Credits
 
 ### Libraries Used
