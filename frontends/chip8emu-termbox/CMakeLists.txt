@@ -4,4 +4,4 @@ project(chip8emu-termbox)
 
 add_executable(${PROJECT_NAME} "main.c")
 
-target_link_libraries(${PROJECT_NAME} chip8emu tinycthread termbox logc)
+target_link_libraries(${PROJECT_NAME} chip8emu tinycthread termbox logc libsoundio_static ${LIBSOUNDIO_LIBS} ${LIBM})

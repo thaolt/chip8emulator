@@ -6,8 +6,9 @@
 
 #include "termbox.h"
 #include "log.h"
-#include "chip8emu.h"
 #include "tinycthread.h"
+
+#include "chip8emu.h"
 
 #define DISPLAY_WIDTH   64
 #define DISPLAY_HEIGHT  16 /* x 2 */
@@ -34,13 +35,7 @@ static const uint32_t block_char[] = {
 };
 
 static mtx_t draw_mtx;
-static mtx_t timer_mtx;
-static mtx_t emu_cycle_mtx;
-
 static cnd_t draw_cnd;
-static cnd_t clk_timer_cnd;
-static cnd_t clk_emu_cnd;
-
 static uint8_t keybuffer[0x10] = {0};
 
 void tb_print(const char *str, int x, int y, uint16_t fg, uint16_t bg)
@@ -87,7 +82,6 @@ void draw_display(uint8_t *buffer) {
 void draw_keyboard() {
 
 }
-
 
 void draw_layout() {
 
@@ -143,18 +137,12 @@ void draw_all(chip8emu* emu) {
     tb_present();
 }
 
-int emulator_thread(void* arg) {
-    chip8emu * emu = (chip8emu*) arg;
-    while (true) {
-        mtx_lock(&emu_cycle_mtx);
-        cnd_wait(&clk_emu_cnd, &emu_cycle_mtx);
-        chip8emu_exec_cycle(emu);
-        mtx_unlock(&emu_cycle_mtx);
-    }
-}
 
 void draw_callback(chip8emu *emu) {
     (void)emu;
+    mtx_lock(&draw_mtx);
+    cnd_signal(&draw_cnd);
+    mtx_unlock(&draw_mtx);
 }
 
 bool keystate_callback(uint8_t key) {
@@ -170,37 +158,20 @@ int display_draw_thread(void *arg) {
 
     draw_all(emu);
 
-    uint8_t counter = 0;
-
     while (true) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
-
-        counter++;
-        if (counter == 2) {
-            draw_display(emu->gfx);
-            draw_registers(emu);
-            tb_present();
-            counter = 0;
-        }
-
+        draw_display(emu->gfx);
+        draw_registers(emu);
+        tb_present();
         mtx_unlock(&draw_mtx);
     }
 
 }
 
-int timer_tick_thread(void *arg) {
-    chip8emu * emu = (chip8emu*) arg;
-    while (true) {
-        mtx_lock(&timer_mtx);
-        cnd_wait(&clk_timer_cnd, &timer_mtx);
-        chip8emu_timer_tick(emu);
-        mtx_unlock(&timer_mtx);
-    }
-}
 
 int keypad_thread(void *arg) {
-    (void)arg;
+    chip8emu * emu = (chip8emu*) arg;
     bool quit = false;
     int c = getchar();
     struct timespec delay = {
@@ -258,38 +229,21 @@ int keypad_thread(void *arg) {
         case 'q':
             quit = true;
             break;
+        case 'r':
+            chip8emu_reset(emu);
+            break;
+        case ']':
+            chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) + 100);
+            break;
+        case '[':
+            chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
+            break;
         }
         c = getchar();
     }
     return 0;
 }
 
-int clk_timer_thread(void *arg) {
-    (void)arg;
-    struct timespec delay = {
-        .tv_sec = 0,
-        .tv_nsec = 16666666
-    };
-    while (true) {
-        thrd_sleep(&delay, 0);
-        cnd_signal(&clk_timer_cnd);
-    }
-}
-
-int clk_emu_cycle_thread(void *arg) {
-    (void)arg;
-    struct timespec delay = {
-        .tv_sec = 0,
-        .tv_nsec = 1000000
-    };
-    while (true) {
-        thrd_sleep(&delay, 0);
-        cnd_signal(&clk_emu_cnd);
-        mtx_lock(&draw_mtx);
-        cnd_signal(&draw_cnd);
-        mtx_unlock(&draw_mtx);
-    }
-}
 
 int main(int argc, char **argv) {
     (void)argc; (void)argv; /* unused variables */
@@ -306,42 +260,17 @@ int main(int argc, char **argv) {
     emu->beep = &beep;
 
     chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_start(emu);
 
-    thrd_t thrd_emu;
-    thrd_t thrd_timer;
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
-
-    /* clock threads */
-    thrd_t thrd_timer_clk;
-    thrd_t thrd_emu_cycle_clk;
-
-    if (thrd_create(&thrd_timer_clk, clk_timer_thread, (void*)0) != thrd_success) {
-        log_error("Cannot create timer clock thread!");
-        goto quit;
-    }
-
-    if (thrd_create(&thrd_emu_cycle_clk, clk_emu_cycle_thread, (void*)0) != thrd_success) {
-        log_error("Cannot create emu cycle timer clock thread!");
-        goto quit;
-    }
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
         log_error("Cannot create draw thread!");
         goto quit;
     }
 
-    if (thrd_create(&thrd_emu, emulator_thread, (void*)emu) != thrd_success) {
-        log_error("Cannot create emulator thread!");
-        goto quit;
-    }
-
-    if (thrd_create(&thrd_timer, timer_tick_thread, (void*)emu) != thrd_success) {
-        log_error("Cannot create timer thread!");
-        goto quit;
-    }
-
-    if (thrd_create(&thrd_keypad, keypad_thread, (void*)0) != thrd_success) {
+    if (thrd_create(&thrd_keypad, keypad_thread, (void*)emu) != thrd_success) {
         log_error("Cannot create keypad thread!");
         goto quit;
     }

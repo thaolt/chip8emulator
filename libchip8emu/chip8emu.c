@@ -4,6 +4,8 @@
 #include "log.h"
 #include "chip8emu.h"
 
+static long NANOSECS_PER_SEC = 1000000000;
+
 static uint8_t chip8_fontset[80] =
 {
   0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -49,6 +51,19 @@ chip8emu *chip8emu_new(void)
     emu->draw = 0;
     emu->keystate = 0;
     emu->beep = 0;
+
+#ifdef CHIP8EMU_USED_THREAD
+    emu->_cpu_clk_delay = malloc(sizeof (struct timespec));
+    emu->_timer_clk_delay = malloc(sizeof (struct timespec));
+
+    struct timespec* cpu_clk_delay = (struct timespec*) emu->_cpu_clk_delay;
+    cpu_clk_delay->tv_sec = 0;
+    cpu_clk_delay->tv_nsec = 1000000; /* default to 500Hz */
+
+    struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
+    timer_clk_delay->tv_sec = 0;
+    timer_clk_delay->tv_nsec = 16666666; /* default to 60Hz */
+#endif /* CHIP8EMU_USED_THREAD */
 
     return emu;
 }
@@ -330,3 +345,160 @@ void chip8emu_timer_tick(chip8emu *emu)
         --emu->sound_timer;
     }
 }
+
+#ifdef CHIP8EMU_USED_THREAD
+
+#include "tinycthread.h"
+
+/* clock threads */
+static thrd_t thrd_clk_timers;
+static thrd_t thrd_clk_cpu;
+
+/* emulation threads */
+static thrd_t thrd_cpu_cycle;
+static thrd_t thrd_timer_tick;
+
+/* mutexes */
+static mtx_t mtx_cpu;
+static mtx_t mtx_timers;
+
+/* conditional signals */
+static cnd_t cnd_clk_timers;
+static cnd_t cnd_clk_cpu;
+
+
+
+static int chip8emu_thread_clk_timers(void *arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    while (true) {
+        thrd_sleep(emu->_timer_clk_delay, 0);
+        mtx_lock(&mtx_cpu);
+        cnd_signal(&cnd_clk_timers);
+        mtx_unlock(&mtx_cpu);
+    }
+}
+
+static int chip8emu_thread_clk_cpu(void *arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    while (true) {
+        thrd_sleep(emu->_cpu_clk_delay, 0);
+        mtx_lock(&mtx_timers);
+        cnd_signal(&cnd_clk_cpu);
+        mtx_unlock(&mtx_timers);
+    }
+}
+
+static int chip8emu_thread_timer_tick(void *arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    while (true) {
+        mtx_lock(&mtx_timers);
+        cnd_wait(&cnd_clk_timers, &mtx_timers);
+        chip8emu_timer_tick(emu);
+        mtx_unlock(&mtx_timers);
+    }
+}
+
+
+static int chip8emu_thread_cpu_cycle(void* arg) {
+    chip8emu * emu = (chip8emu*) arg;
+    while (true) {
+        mtx_lock(&mtx_cpu);
+        cnd_wait(&cnd_clk_cpu, &mtx_cpu);
+        chip8emu_exec_cycle(emu);
+        mtx_unlock(&mtx_cpu);
+    }
+}
+
+
+void chip8emu_start(chip8emu *emu)
+{
+    /* start cpu clock */
+    if (thrd_create(&thrd_clk_cpu, chip8emu_thread_clk_cpu, (void*)emu) != thrd_success) {
+        log_error("Cannot create cpu_clock thread!");
+    }
+
+    /* start timers clock */
+    if (thrd_create(&thrd_clk_timers, chip8emu_thread_clk_timers, (void*)emu) != thrd_success) {
+        log_error("Cannot create timer_clock thread!");
+    }
+
+    if (thrd_create(&thrd_cpu_cycle, chip8emu_thread_cpu_cycle, (void*)emu) != thrd_success) {
+        log_error("Cannot create emu cycle timer clock thread!");
+    }
+
+    if (thrd_create(&thrd_timer_tick, chip8emu_thread_timer_tick, (void*)emu) != thrd_success) {
+        log_error("Cannot create emu cycle timer clock thread!");
+    }
+
+}
+
+void chip8emu_pause(chip8emu *emu)
+{
+
+}
+
+void chip8emu_resume(chip8emu *emu)
+{
+
+}
+
+void chip8emu_reset(chip8emu *emu)
+{
+    mtx_lock(&mtx_timers);
+    mtx_lock(&mtx_cpu);
+
+    emu->pc     = 0x200;  /* Program counter starts at 0x200 */
+    emu->opcode = 0;      /* Reset current opcode */
+    emu->I      = 0;      /* Reset index register */
+    emu->sp     = 0;      /* Reset stack pointer */
+
+    memset(&(emu->gfx), 0, 64 * 32);      /* Clear display */
+    memset(&(emu->stack), 0, 16);         /* Clear stack */
+    memset(&(emu->V), 0, 16);             /* Clear registers V0-VF */
+
+    emu->delay_timer = 0;
+    emu->sound_timer = 0;
+
+    emu->draw(emu);
+
+    mtx_unlock(&mtx_cpu);
+    mtx_unlock(&mtx_timers);
+}
+
+
+void chip8emu_set_cpu_speed(chip8emu *emu, long speed_in_hz)
+{
+    struct timespec* cpu_clk_delay = (struct timespec*) emu->_cpu_clk_delay;
+    mtx_lock(&mtx_cpu);
+    cpu_clk_delay->tv_nsec = NANOSECS_PER_SEC / speed_in_hz;
+    mtx_unlock(&mtx_cpu);
+}
+
+long chip8emu_get_cpu_speed(chip8emu *emu)
+{
+    struct timespec* cpu_clk_delay = (struct timespec*) emu->_cpu_clk_delay;
+    mtx_lock(&mtx_cpu);
+    long speed_in_hz =  NANOSECS_PER_SEC / cpu_clk_delay->tv_nsec;
+    mtx_unlock(&mtx_cpu);
+    return speed_in_hz;
+}
+
+void chip8emu_set_timer_speed(chip8emu *emu, long speed_in_hz)
+{
+    struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
+    mtx_lock(&mtx_timers);
+    timer_clk_delay->tv_nsec = NANOSECS_PER_SEC / speed_in_hz;
+    mtx_unlock(&mtx_timers);
+}
+
+long chip8emu_get_timer_speed(chip8emu *emu)
+{
+    struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
+    mtx_lock(&mtx_timers);
+    long speed_in_hz = NANOSECS_PER_SEC / timer_clk_delay->tv_nsec;
+    mtx_unlock(&mtx_timers);
+    return speed_in_hz;
+}
+
+
+#endif /* CHIP8EMU_USED_THREAD */

@@ -6,8 +6,12 @@ include_directories(${CMAKE_SOURCE_DIR}/libchip8emu)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/termbox/origin/src)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/log.c/origin/src)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/tinycthread/source)
+include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/soundio)
+include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/src)
 
 link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+
+add_definitions(-DCHIP8EMU_USED_THREAD)
 
 add_subdirectory(3rdparty)
 add_subdirectory(libchip8emu)
