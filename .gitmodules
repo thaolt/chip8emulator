@@ -10,3 +10,6 @@
 [submodule "3rdparty/libsoundio"]
 	path = 3rdparty/libsoundio
 	url = https://github.com/andrewrk/libsoundio.git
+[submodule "3rdparty/zf_log"]
+	path = 3rdparty/zf_log
+	url = https://github.com/wonder-mice/zf_log.git
