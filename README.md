@@ -1,6 +1,6 @@
 # chip8emu
 
-A C99 implementation of CHIP8 emulation library
+A lightweight, cross platform C99 implementation of CHIP8 emulation library
 
 ## Quick started
 
