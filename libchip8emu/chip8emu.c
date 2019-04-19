@@ -66,7 +66,7 @@ chip8emu *chip8emu_new(void)
 
     struct timespec* cpu_clk_delay = (struct timespec*) emu->_cpu_clk_delay;
     cpu_clk_delay->tv_sec = 0;
-    cpu_clk_delay->tv_nsec = 1000000; /* default to 500Hz */
+    cpu_clk_delay->tv_nsec = 2000000; /* default to 500Hz */
 
     struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
     timer_clk_delay->tv_sec = 0;

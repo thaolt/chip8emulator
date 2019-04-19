@@ -265,9 +265,6 @@ int main(int argc, char **argv) {
     emu->keystate= &keystate_callback;
     emu->beep = &beep;
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    chip8emu_start(emu);
-
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
 
@@ -280,6 +277,9 @@ int main(int argc, char **argv) {
         log_error("Cannot create keypad thread!");
         goto quit;
     }
+
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_start(emu);
 
     thrd_join(thrd_keypad, NULL);
 
