@@ -11,7 +11,7 @@ git submodule update --init
 mkdir build && cd build
 cmake ..
 make
-cd frontends/chip8emu-termbox
+cd dist/
 ./chip8emu-termbox
 ```
 
