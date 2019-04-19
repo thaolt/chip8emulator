@@ -1,6 +1,10 @@
 #ifndef CHIP8EMU_H_
 #define CHIP8EMU_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -29,9 +33,28 @@ struct chip8emu
     void (*beep)(void);
 
 #ifndef CHIP8EMU_NO_THREAD
+    bool paused;
+
     void* _cpu_clk_delay;     /* struct timespec */
     void* _timer_clk_delay;   /* struct timespec */
-    bool paused;
+
+    /* clock threads */
+    void* thrd_clk_timers;
+    void* thrd_clk_cpu;
+    /* emulation threads */
+    void* thrd_cpu_cycle;
+    void* thrd_timer_tick;
+
+    /* mutexes */
+    void* mtx_cpu;
+    void* mtx_timers;
+    void* mtx_pause;
+
+    /* conditional signals */
+    void* cnd_clk_timers;
+    void* cnd_clk_cpu;
+    void* cnd_resume_cpu;
+    void* cnd_resume_timers;
 #endif /* CHIP8EMU_NO_THREAD */
 };
 
@@ -54,5 +77,9 @@ long chip8emu_get_cpu_speed(chip8emu *emu);
 void chip8emu_set_timer_speed(chip8emu *emu, long speed_in_hz);
 long chip8emu_get_timer_speed(chip8emu *emu);
 #endif /* CHIP8EMU_NO_THREAD */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CHIP8EMU_H_ */

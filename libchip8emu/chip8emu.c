@@ -4,7 +4,13 @@
 #include "log.h"
 #include "chip8emu.h"
 
-static long NANOSECS_PER_SEC = 1000000000;
+#ifndef CHIP8EMU_NO_THREAD
+
+#include "tinycthread.h"
+
+#endif /*CHIP8EMU_NO_THREAD*/
+
+#define NANOSECS_PER_SEC 1000000000
 
 static uint8_t chip8_fontset[80] =
 {
@@ -65,6 +71,20 @@ chip8emu *chip8emu_new(void)
     struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
     timer_clk_delay->tv_sec = 0;
     timer_clk_delay->tv_nsec = 16666666; /* default to 60Hz */
+
+    emu->thrd_clk_timers = malloc(sizeof (thrd_t));
+    emu->thrd_timer_tick = malloc(sizeof (thrd_t));
+    emu->thrd_clk_cpu = malloc(sizeof (thrd_t));
+    emu->thrd_cpu_cycle = malloc(sizeof (thrd_t));
+
+    emu->mtx_cpu = malloc(sizeof (mtx_t));
+    emu->mtx_timers = malloc(sizeof (mtx_t));
+    emu->mtx_pause = malloc(sizeof (mtx_t));
+
+    emu->cnd_clk_cpu = malloc(sizeof (cnd_t));
+    emu->cnd_clk_timers = malloc(sizeof (cnd_t));
+    emu->cnd_resume_cpu = malloc(sizeof (cnd_t));
+    emu->cnd_resume_timers = malloc(sizeof (cnd_t));
 #endif /* CHIP8EMU_NO_THREAD */
 
     return emu;
@@ -350,39 +370,18 @@ void chip8emu_timer_tick(chip8emu *emu)
 
 #ifndef CHIP8EMU_NO_THREAD
 
-#include "tinycthread.h"
-
-/* clock threads */
-static thrd_t thrd_clk_timers;
-static thrd_t thrd_clk_cpu;
-
-/* emulation threads */
-static thrd_t thrd_cpu_cycle;
-static thrd_t thrd_timer_tick;
-
-/* mutexes */
-static mtx_t mtx_cpu;
-static mtx_t mtx_timers;
-static mtx_t mtx_pause;
-
-/* conditional signals */
-static cnd_t cnd_clk_timers;
-static cnd_t cnd_clk_cpu;
-static cnd_t cnd_resume_cpu;
-static cnd_t cnd_resume_timers;
-
 static int chip8emu_thread_clk_timers(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     while (true) {
 
-        mtx_lock(&mtx_pause);
+        mtx_lock(emu->mtx_pause);
         if (emu->paused)
-            cnd_wait(&cnd_resume_timers, &mtx_pause);
-        mtx_unlock(&mtx_pause);
+            cnd_wait(emu->cnd_resume_timers, emu->mtx_pause);
+        mtx_unlock(emu->mtx_pause);
 
-        mtx_lock(&mtx_cpu);
-        cnd_signal(&cnd_clk_timers);
-        mtx_unlock(&mtx_cpu);
+        mtx_lock(emu->mtx_cpu);
+        cnd_signal(emu->cnd_clk_timers);
+        mtx_unlock(emu->mtx_cpu);
 
         thrd_sleep(emu->_timer_clk_delay, 0);
     }
@@ -391,25 +390,25 @@ static int chip8emu_thread_clk_timers(void *arg) {
 static int chip8emu_thread_clk_cpu(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     while (true) {
-        mtx_lock(&mtx_pause);
+        mtx_lock(emu->mtx_pause);
         if (emu->paused)
-            cnd_wait(&cnd_resume_cpu, &mtx_pause);
-        mtx_unlock(&mtx_pause);
+            cnd_wait(emu->cnd_resume_cpu, emu->mtx_pause);
+        mtx_unlock(emu->mtx_pause);
 
         thrd_sleep(emu->_cpu_clk_delay, 0);
-        mtx_lock(&mtx_timers);
-        cnd_signal(&cnd_clk_cpu);
-        mtx_unlock(&mtx_timers);
+        mtx_lock(emu->mtx_timers);
+        cnd_signal(emu->cnd_clk_cpu);
+        mtx_unlock(emu->mtx_timers);
     }
 }
 
 static int chip8emu_thread_timer_tick(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     while (true) {
-        mtx_lock(&mtx_timers);
-        cnd_wait(&cnd_clk_timers, &mtx_timers);
+        mtx_lock(emu->mtx_timers);
+        cnd_wait(emu->cnd_clk_timers, emu->mtx_timers);
         chip8emu_timer_tick(emu);
-        mtx_unlock(&mtx_timers);
+        mtx_unlock(emu->mtx_timers);
     }
 }
 
@@ -417,10 +416,10 @@ static int chip8emu_thread_timer_tick(void *arg) {
 static int chip8emu_thread_cpu_cycle(void* arg) {
     chip8emu * emu = (chip8emu*) arg;
     while (true) {
-        mtx_lock(&mtx_cpu);
-        cnd_wait(&cnd_clk_cpu, &mtx_cpu);
+        mtx_lock(emu->mtx_cpu);
+        cnd_wait(emu->cnd_clk_cpu, emu->mtx_cpu);
         chip8emu_exec_cycle(emu);
-        mtx_unlock(&mtx_cpu);
+        mtx_unlock(emu->mtx_cpu);
     }
 }
 
@@ -428,20 +427,20 @@ static int chip8emu_thread_cpu_cycle(void* arg) {
 void chip8emu_start(chip8emu *emu)
 {
     /* start cpu clock */
-    if (thrd_create(&thrd_clk_cpu, chip8emu_thread_clk_cpu, (void*)emu) != thrd_success) {
+    if (thrd_create(emu->thrd_clk_cpu, chip8emu_thread_clk_cpu, (void*)emu) != thrd_success) {
         log_error("Cannot create cpu_clock thread!");
     }
 
     /* start timers clock */
-    if (thrd_create(&thrd_clk_timers, chip8emu_thread_clk_timers, (void*)emu) != thrd_success) {
+    if (thrd_create(emu->thrd_clk_timers, chip8emu_thread_clk_timers, (void*)emu) != thrd_success) {
         log_error("Cannot create timer_clock thread!");
     }
 
-    if (thrd_create(&thrd_cpu_cycle, chip8emu_thread_cpu_cycle, (void*)emu) != thrd_success) {
+    if (thrd_create(emu->thrd_cpu_cycle, chip8emu_thread_cpu_cycle, (void*)emu) != thrd_success) {
         log_error("Cannot create emu cycle timer clock thread!");
     }
 
-    if (thrd_create(&thrd_timer_tick, chip8emu_thread_timer_tick, (void*)emu) != thrd_success) {
+    if (thrd_create(emu->thrd_timer_tick, chip8emu_thread_timer_tick, (void*)emu) != thrd_success) {
         log_error("Cannot create emu cycle timer clock thread!");
     }
 
@@ -450,24 +449,24 @@ void chip8emu_start(chip8emu *emu)
 
 void chip8emu_pause(chip8emu *emu)
 {
-    mtx_lock(&mtx_pause);
+    mtx_lock(emu->mtx_pause);
     emu->paused = true;
-    mtx_unlock(&mtx_pause);
+    mtx_unlock(emu->mtx_pause);
 }
 
 void chip8emu_resume(chip8emu *emu)
 {
-    mtx_lock(&mtx_pause);
+    mtx_lock(emu->mtx_pause);
     emu->paused = false;
-    cnd_signal(&cnd_resume_cpu);
-    cnd_signal(&cnd_resume_timers);
-    mtx_unlock(&mtx_pause);
+    cnd_signal(emu->cnd_resume_cpu);
+    cnd_signal(emu->cnd_resume_timers);
+    mtx_unlock(emu->mtx_pause);
 }
 
 void chip8emu_reset(chip8emu *emu)
 {
-    mtx_lock(&mtx_timers);
-    mtx_lock(&mtx_cpu);
+    mtx_lock(emu->mtx_timers);
+    mtx_lock(emu->mtx_cpu);
 
     emu->pc     = 0x200;  /* Program counter starts at 0x200 */
     emu->opcode = 0;      /* Reset current opcode */
@@ -483,8 +482,8 @@ void chip8emu_reset(chip8emu *emu)
 
     emu->draw(emu);
 
-    mtx_unlock(&mtx_cpu);
-    mtx_unlock(&mtx_timers);
+    mtx_unlock(emu->mtx_cpu);
+    mtx_unlock(emu->mtx_timers);
 
     chip8emu_resume(emu);
 }
@@ -493,34 +492,34 @@ void chip8emu_reset(chip8emu *emu)
 void chip8emu_set_cpu_speed(chip8emu *emu, long speed_in_hz)
 {
     struct timespec* cpu_clk_delay = (struct timespec*) emu->_cpu_clk_delay;
-    mtx_lock(&mtx_cpu);
+    mtx_lock(emu->mtx_cpu);
     cpu_clk_delay->tv_nsec = NANOSECS_PER_SEC / speed_in_hz;
-    mtx_unlock(&mtx_cpu);
+    mtx_unlock(emu->mtx_cpu);
 }
 
 long chip8emu_get_cpu_speed(chip8emu *emu)
 {
     struct timespec* cpu_clk_delay = (struct timespec*) emu->_cpu_clk_delay;
-    mtx_lock(&mtx_cpu);
+    mtx_lock(emu->mtx_cpu);
     long speed_in_hz =  NANOSECS_PER_SEC / cpu_clk_delay->tv_nsec;
-    mtx_unlock(&mtx_cpu);
+    mtx_unlock(emu->mtx_cpu);
     return speed_in_hz;
 }
 
 void chip8emu_set_timer_speed(chip8emu *emu, long speed_in_hz)
 {
     struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
-    mtx_lock(&mtx_timers);
+    mtx_lock(emu->mtx_timers);
     timer_clk_delay->tv_nsec = NANOSECS_PER_SEC / speed_in_hz;
-    mtx_unlock(&mtx_timers);
+    mtx_unlock(emu->mtx_timers);
 }
 
 long chip8emu_get_timer_speed(chip8emu *emu)
 {
     struct timespec* timer_clk_delay = (struct timespec*) emu->_timer_clk_delay;
-    mtx_lock(&mtx_timers);
+    mtx_lock(emu->mtx_timers);
     long speed_in_hz = NANOSECS_PER_SEC / timer_clk_delay->tv_nsec;
-    mtx_unlock(&mtx_timers);
+    mtx_unlock(emu->mtx_timers);
     return speed_in_hz;
 }
 
