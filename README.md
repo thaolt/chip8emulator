@@ -20,8 +20,8 @@ cd dist/
 ### C99
 
 * chip8emu-termbox
+* chip8emu-sdl2
 * chip8emu-cdk (planned)
-* chip8emu-sdl (planned)
 
 ### C++
 
