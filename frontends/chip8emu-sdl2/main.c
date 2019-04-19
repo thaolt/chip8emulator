@@ -52,7 +52,6 @@ void beep_callback() {
 int keypad_thread(void *arg) {
     chip8emu * cpu = (chip8emu*) arg;
 
-    // Process SDL events
     SDL_Event e;
     bool quit = false;
     struct timespec delay = {
@@ -63,7 +62,6 @@ int keypad_thread(void *arg) {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) quit = true;
 
-            // Process keydown events
             if (e.type == SDL_KEYDOWN) {
                 mtx_lock(&key_mtx);
                 for (int i = 0; i < 16; ++i) {
@@ -74,7 +72,6 @@ int keypad_thread(void *arg) {
                 mtx_unlock(&key_mtx);
             }
 
-            // Process keyup events
             if (e.type == SDL_KEYUP) {
                 if (e.key.keysym.sym == SDLK_ESCAPE)
                     quit = true;
@@ -107,16 +104,13 @@ int display_draw_thread(void *arg) {
     SDL_Renderer *renderer;
     SDL_Texture* sdlTexture;
 
-    // The window we'll be rendering to
     window = NULL;
 
-    // Initialize SDL
     if ( SDL_Init(SDL_INIT_EVERYTHING) < 0 ) {
         printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError() );
         exit(1);
     }
 
-    // Create window
     window = SDL_CreateWindow(
             "CHIP-8 Emulator",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
