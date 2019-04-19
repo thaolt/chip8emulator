@@ -1,1 +1,1 @@
-# libchip8em Bindings
+# libchip8emu Bindings
