@@ -173,14 +173,8 @@ int display_draw_thread(void *arg) {
 int keypad_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     bool quit = false;
-    //int c = getchar();
-    struct timespec delay = {
-        .tv_sec = 0,
-        .tv_nsec = 10000000
-    };
     struct tb_event ev;
     while (!quit) {
-        // thrd_sleep(&delay, 0);
 	tb_peek_event(&ev, 10);
 	if (ev.type == TB_EVENT_KEY)
         switch (ev.ch) {
@@ -248,7 +242,6 @@ int keypad_thread(void *arg) {
                 chip8emu_pause(emu);
             break;
         }
-        // c = getchar();
     }
     return 0;
 }
