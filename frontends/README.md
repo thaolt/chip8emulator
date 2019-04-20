@@ -76,8 +76,6 @@ bool keystate_callback(uint8_t idx) {
 }
 ```
 
-_I don't include example for termbox keystate callback here because it's quite long, you could checkout the source code to see the implementation._
-
 **Load rom file into memory**
 
 ```c
