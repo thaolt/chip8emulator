@@ -40,10 +40,41 @@ cpu->beep = &beep_callback;
 **Prototypes for above callbacks**
 
 ```c
-void draw(chip8emu* cpu);
-bool keystate(uint8_t key);
-void beep(void);
+void draw_callback(chip8emu* cpu);
+bool keystate_callback(uint8_t key);
+void beep_callback(void);
 ```
+
+Example for `keystate_callback` implementation in SDL2
+
+```c
+/* Keypad keymap */
+static int keymap[16] = {
+    SDLK_KP_0,
+    SDLK_KP_1,
+    SDLK_KP_2,
+    SDLK_KP_3,
+    SDLK_KP_4,
+    SDLK_KP_5,
+    SDLK_KP_6,
+    SDLK_KP_7,
+    SDLK_KP_8,
+    SDLK_KP_9,
+    SDLK_KP_ENTER,
+    SDLK_KP_PERIOD,
+    SDLK_KP_PLUS,
+    SDLK_KP_MINUS,
+    SDLK_KP_MULTIPLY,
+    SDLK_KP_DIVIDE,
+};
+
+bool keystate_callback(uint8_t idx) {
+    Uint8 *kbstate = SDL_GetKeyState(NULL);
+    return (kbstate | keymap[idx]);
+}
+```
+
+_I don't include example for termbox keystate callback here because it's quite long, you could checkout the source code to see the implementation._
 
 **Load rom file into memory**
 
