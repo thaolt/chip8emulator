@@ -13,3 +13,6 @@
 [submodule "3rdparty/zf_log"]
 	path = 3rdparty/zf_log
 	url = https://github.com/wonder-mice/zf_log.git
+[submodule "3rdparty/Collections-C"]
+	path = 3rdparty/Collections-C
+	url = https://github.com/srdja/Collections-C.git
