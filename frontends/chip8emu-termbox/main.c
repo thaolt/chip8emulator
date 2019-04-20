@@ -4,9 +4,10 @@
 #include <string.h>
 #include <time.h>
 
-#include "termbox.h"
 #include "log.h"
+#include "termbox.h"
 #include "tinycthread.h"
+#include "soundio.h"
 
 #include "chip8emu.h"
 
@@ -17,14 +18,14 @@
 #define DISP_BG TB_BLACK
 
 static const uint32_t box_drawing[] = {
-    0x250C, /* ┌ */
-    0x2500, /* ─ */
-    0x252C, /* ┬ */
-    0x2510, /* ┐ */
-    0x2502, /* │ */
-    0x2514, /* └ */
-    0x2534, /* ┴ */
-    0x2518, /* ┘ */
+/*0*/    0x250C, /* ┌ */
+/*1*/    0x2500, /* ─ */
+/*2*/    0x252C, /* ┬ */
+/*3*/    0x2510, /* ┐ */
+/*4*/    0x2502, /* │ */
+/*5*/    0x2514, /* └ */
+/*6*/    0x2534, /* ┴ */
+/*7*/    0x2518, /* ┘ */
 };
 
 static const uint32_t block_char[] = {
@@ -84,13 +85,16 @@ void draw_keyboard() {
 }
 
 void draw_layout() {
-
     const char *disp_title = "Display";
     uint8_t disp_title_len = (uint8_t) strlen(disp_title);
 
     const char *reg_pane_title = "Registers";
     uint8_t reg_pane_title_len = (uint8_t) strlen(reg_pane_title);
 
+    const char *cpu_pane_title = "CPU";
+    uint8_t cpu_pane_title_len = (uint8_t) strlen(cpu_pane_title);
+
+    /* DISPLAY BOX */
     tb_change_cell(0, 0, box_drawing[0], 0, 0);
     tb_print(disp_title, 1, 0, 0, 0);
     for (int x = disp_title_len+1; x < DISPLAY_WIDTH + 1; ++x) {
@@ -117,16 +121,35 @@ void draw_layout() {
     }
     tb_change_cell(tb_width()-1, DISPLAY_HEIGHT+1, box_drawing[7], 0, 0);
 
+    /* CPU BOX */
+    uint8_t cpu_pane_left = DISPLAY_WIDTH + 2 + reg_pane_title_len;
+    tb_change_cell(cpu_pane_left, 0, box_drawing[2], 0, 0);
+    tb_print(cpu_pane_title, cpu_pane_left + 1, 0, 0, 0);
+    for (int y = 1; y < DISPLAY_HEIGHT + 1; ++y) {
+        tb_change_cell(cpu_pane_left, y, box_drawing[4], 0, 0);
+    }
+    tb_change_cell(cpu_pane_left, DISPLAY_HEIGHT+1, box_drawing[6], 0, 0);
 }
 
-void beep() {
+void beep_callback() {
 
 }
 
 void draw_registers(chip8emu* emu) {
     for (int i = 0; i < 16; ++i) {
-        tb_printf(64 + 3, 1 + i, 0, 0, "V%X %02X", i, emu->V[i]);
+        tb_printf(64 + 3, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
     }
+    uint8_t cpu_pane_left = DISPLAY_WIDTH + 2 + 10;
+    tb_printf(cpu_pane_left + 1, 1, 0, 0, "CLK");
+    tb_printf(cpu_pane_left + 1, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
+    tb_printf(cpu_pane_left + 1, 3, 0, 0, "  TMR %4dHz", chip8emu_get_timer_speed(emu));
+    
+    tb_printf(cpu_pane_left + 1, 4, 0, 0, "DT #%02X", emu->delay_timer);
+    tb_printf(cpu_pane_left + 1, 5, 0, 0, "ST #%02X", emu->sound_timer);
+    
+    tb_printf(cpu_pane_left + 1, 6, 0, 0, "PC #%04X", emu->pc);
+    tb_printf(cpu_pane_left + 1, 7, 0, 0, " I #%04X", emu->I);
+    tb_printf(cpu_pane_left + 1, 8, 0, 0, "SP #%02X", emu->sp);
 }
 
 void draw_all(chip8emu* emu) {
@@ -166,9 +189,7 @@ int display_draw_thread(void *arg) {
         tb_present();
         mtx_unlock(&draw_mtx);
     }
-
 }
-
 
 int keypad_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
@@ -246,7 +267,6 @@ int keypad_thread(void *arg) {
     return 0;
 }
 
-
 int main(int argc, char **argv) {
     (void)argc; (void)argv; /* unused variables */
 
@@ -259,13 +279,13 @@ int main(int argc, char **argv) {
     chip8emu *emu = chip8emu_new();
     emu->draw = &draw_callback;
     emu->keystate= &keystate_callback;
-    emu->beep = &beep;
+    emu->beep = &beep_callback;
 
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    chip8emu_set_cpu_speed(emu,1000);
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/BRIX");
+    chip8emu_set_cpu_speed(emu, 1000);
     chip8emu_start(emu);
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
