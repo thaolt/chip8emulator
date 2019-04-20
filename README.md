@@ -33,8 +33,10 @@ cd dist/
 
 ## Screenshots
 
-![sdl_basic_frontend](docs/img/sdl_basic_front_end.png)
-![termbox_frontend](docs/img/termbox_frontend.png)
+
+SDL2 | Termbox
+--- | --- 
+![sdl_basic_frontend](docs/img/sdl_basic_front_end.png) | ![termbox_frontend](docs/img/termbox_frontend.png)
 
 ## Credits
 

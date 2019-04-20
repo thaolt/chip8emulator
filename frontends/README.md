@@ -37,7 +37,7 @@ cpu->beep = &beep_callback;
 
 `draw_callback`, `keystate_callback`, `beep_callback` are your own implementations which you decise how you would like to draw display, where to get keypad input source (either SDL, curses or hardware interupts for embedded devices) and how to output beep sound on your target device.
 
-The callbacks will be called while the emulator is executing cycles. My recommendation for `draw_callback` implementation is only write code for triggering thread conditional signal in the callback for another thread that do actual drawing functionalities, check out any of my frontend for example implementation.
+The callbacks will be called while the emulator is executing cycles. My recommendation for `draw_callback` implementation is only write code for triggering thread conditional signal in the callback for another thread that do actual drawing functionalities, check out any of my frontend for examples.
 
 **Prototypes for above callbacks**
 
@@ -75,8 +75,6 @@ bool keystate_callback(uint8_t idx) {
     return (kbstate | keymap[idx]);
 }
 ```
-
-_I don't include example for termbox keystate callback here because it's quite long, you could checkout the source code to see the implementation._
 
 **Load rom file into memory**
 
