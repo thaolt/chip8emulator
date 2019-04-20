@@ -45,4 +45,31 @@ bool keystate(uint8_t key);
 void beep(void);
 ```
 
+**Load rom file into memory**
+
+```c
+chip8emu_load_rom("/path/to/chip8rom.ch8");
+```
+
+**Change emulated CPU clock speed**
+
+Default CPU clock speed set to 500Hz, for example: if you would like to change to 1000Hz
+
+```c
+chip8emu_set_cpu_speed(cpu, 1000);
+```
+
+**Start the emulation**
+
+```c
+chip8emu_start(cpu);
+```
+
+**Pause, Resume, Reset the emulation**
+
+In your main loop, you could map keys to pause, resume, reset emulation through these funtions:
+
+* `chip8emu_pause(cpu)`
+* `chip8emu_resume(cpu)`
+* `chip8emu_reset(cpu)`
 
