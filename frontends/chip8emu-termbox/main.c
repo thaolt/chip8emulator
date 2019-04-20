@@ -173,14 +173,17 @@ int display_draw_thread(void *arg) {
 int keypad_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     bool quit = false;
-    int c = getchar();
+    //int c = getchar();
     struct timespec delay = {
         .tv_sec = 0,
         .tv_nsec = 10000000
     };
+    struct tb_event ev;
     while (!quit) {
-        thrd_sleep(&delay, 0);
-        switch (c) {
+        // thrd_sleep(&delay, 0);
+	tb_peek_event(&ev, 10);
+	if (ev.type == TB_EVENT_KEY)
+        switch (ev.ch) {
         case '0':
             keybuffer[0x0]++;
             break;
@@ -245,7 +248,7 @@ int keypad_thread(void *arg) {
                 chip8emu_pause(emu);
             break;
         }
-        c = getchar();
+        // c = getchar();
     }
     return 0;
 }
@@ -268,6 +271,10 @@ int main(int argc, char **argv) {
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
 
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_set_cpu_speed(emu,1000);
+    chip8emu_start(emu);
+
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
         log_error("Cannot create draw thread!");
         goto quit;
@@ -277,10 +284,6 @@ int main(int argc, char **argv) {
         log_error("Cannot create keypad thread!");
         goto quit;
     }
-
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    chip8emu_set_cpu_speed(emu,1000);
-    chip8emu_start(emu);
 
     thrd_join(thrd_keypad, NULL);
 
