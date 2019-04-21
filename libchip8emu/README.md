@@ -6,7 +6,7 @@ If you don't want going to much trouble simply copy `chip8emu.c` and `chip8emu.h
 
 Also, be sure to copy `tinycthread.c` and `tinycthread.h` or link to TinyCThread library in your build configuration file (Makefile/CMake/QMake/etc.).
 
-By default, libchip8emu use TinyCThread for handling CPU and Timers clocks. TinyCThread is an awesome threading library for POSIX and Windows OSes. However, if you would like to use your own threading library or you are working with embedded devices that do not have POSIX compliance libraries; then define CHIP8EMU_NO_THREAD (-DCHIP8EMU_NO_THREAD) in your build configuration. With CHIP8EMU_NO_THREAD you can not use some api functions: `chip8emu_start`, `chip8emu_reset`, `chip8emu_pause`, `chip8emu_resume`. You have to handle these functions by yourself. I will probably write an Arduino example for using hardware interupt timers to implement the emulation cycles.
+By default, libchip8emu use TinyCThread for handling CPU and Timers clocks. TinyCThread is an awesome threading library for POSIX and Windows OSes. However, if you would like to use your own threading library or you are working with embedded devices that do not have POSIX compliance libraries; then define `CHIP8EMU_NO_THREAD` (`-DCHIP8EMU_NO_THREAD`) in your build configuration. With `CHIP8EMU_NO_THREAD`, you can not use some api functions: `chip8emu_start`, `chip8emu_reset`, `chip8emu_pause`, `chip8emu_resume`. You have to handle these functions by yourself. I will probably write an Arduino example for using hardware interupt timers to implement the emulation cycles.
 
 ## How to write your own frontend
 
