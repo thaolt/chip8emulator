@@ -99,4 +99,27 @@ In your main loop, you could map keys to pause, resume, reset emulation through 
 * `chip8emu_resume(cpu)`
 * `chip8emu_reset(cpu)`
 
+## With CHIP8EMU_NO_THREAD ( or without TinyCThread )
 
+Poor man's implementation:
+
+```c
+#include "chip8emu.h"
+
+/* ... */
+
+chip8emu *cpu = chip8emu_new();
+cpu->draw = &draw_callback;
+cpu->keystate = &keystate_callback;
+cpu->beep = &beep_callback;
+
+chip8emu_load_rom("/path/to/chip8rom.ch8");
+
+while (true) {
+    chip8emu_exec_cycle(cpu);
+    /* get user's key presses, e.g.: getchar() or SDL_GetKeyState .. */
+    /* give some delay */
+    chip8emu_timer_tick(cpu);
+}
+/* ... */
+```
