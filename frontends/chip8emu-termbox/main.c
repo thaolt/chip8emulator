@@ -18,6 +18,7 @@
 static mtx_t draw_mtx;
 static cnd_t draw_cnd;
 static uint8_t keybuffer[0x10] = {0};
+static uint8_t disp_buffer[64*32] = {0};
 
 static tbui_frame_t *reg_pane;
 static tbui_frame_t *cpu_pane;
@@ -55,6 +56,7 @@ void beep_callback() {
 void draw_callback(chip8emu *emu) {
     (void)emu;
     mtx_lock(&draw_mtx);
+    memcpy(disp_buffer, emu->gfx, 64*32);
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
@@ -67,10 +69,7 @@ bool keystate_callback(uint8_t key) {
     return ret;
 }
 
-
-int display_draw_thread(void *arg) {
-    (void)arg;
-
+static void setup_ui() {
     /* setup UI widgets */
     tb_clear();
 
@@ -105,7 +104,7 @@ int display_draw_thread(void *arg) {
         disp_bitmap->real_height = 32;
         disp_bitmap->fg_color = DISP_FG;
         disp_bitmap->bg_color = DISP_BG;
-        disp_bitmap->data = emu->gfx;
+        disp_bitmap->data = disp_buffer;
 
         tbui_frame_t *pause_frame = tbui_new_frame(disp_pane->widget);
         tbui_set_bound(pause_frame->widget, 28, 7, 10, 3);
@@ -121,6 +120,13 @@ int display_draw_thread(void *arg) {
     }
 
     tbui_redraw(NULL);
+}
+
+
+int display_draw_thread(void *arg) {
+    (void)arg;
+
+    setup_ui();
 
     uint32_t start_time = (uint32_t)time(NULL);
     uint32_t elapsed_time = (uint32_t)time(NULL) - start_time;
@@ -243,8 +249,8 @@ int main(int argc, char **argv) {
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    chip8emu_set_cpu_speed(emu, 1000);
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/worm.ch8");
+    chip8emu_set_cpu_speed(emu, 500);
     chip8emu_start(emu);
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
