@@ -2,7 +2,7 @@
 
 ## Objectives
 
-* Portable, targets: Windows, POSIX or embedded devices Arduino, STM32, MSP430
+* Portable, targets: Windows, POSIX or embedded devices Arduino ATMEGA, STM32, MSP430
 * Flexible: opcodes handlers are function pointers so they can be overrided and/or expanded by library users
 * Opt to be compliance with ISO C99 
 
