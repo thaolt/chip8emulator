@@ -6,7 +6,7 @@
 * Flexible: opcodes handlers are function pointers so they can be overrided and/or expanded by library users
 * Opt to be compliance with ISO C99 
 
-libchip8emu don't get into your way of implementation your emulator.
+libchip8emu don't get into your way of writing your own emulator.
 
 ## How to use the library
 
