@@ -81,7 +81,7 @@ void tbui_printf(tbui_widget_t* widget, int x, int y, uint16_t fg, uint16_t bg, 
 void tbui_draw_hbitmap_mono(tbui_bound_t* bound, uint8_t *buffer, uint16_t fg_color, uint16_t bg_color, int real_width, int real_height);
 /* draw using quarter blocks characters */
 void tbui_draw_qbitmap_mono(tbui_bound_t* bound, uint8_t *buffer, uint16_t fg_color, uint16_t bg_color, int real_width, int real_height);
-/* draw using quarter braille characters */
+/* draw using braille characters */
 void tbui_draw_brbitmap_mono(tbui_bound_t* bound, uint8_t *buffer, uint16_t fg_color, uint16_t bg_color, int real_width, int real_height);
 
 tbui_widget_t* tbui_new_widget(tbui_widget_t* parent);
