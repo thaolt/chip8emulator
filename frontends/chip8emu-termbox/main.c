@@ -17,23 +17,6 @@
 #define DISP_FG TB_CYAN
 #define DISP_BG TB_BLACK
 
-static const uint32_t box_drawing[] = {
-/*0*/    0x250C, /* ┌ */
-/*1*/    0x2500, /* ─ */
-/*2*/    0x252C, /* ┬ */
-/*3*/    0x2510, /* ┐ */
-/*4*/    0x2502, /* │ */
-/*5*/    0x2514, /* └ */
-/*6*/    0x2534, /* ┴ */
-/*7*/    0x2518, /* ┘ */
-};
-
-static const uint32_t block_char[] = {
-    ' ',
-    0x2580, /* ▀ */
-    0x2584, /* ▄ */
-    0x2588, /* █ */
-};
 
 static mtx_t draw_mtx;
 static cnd_t draw_cnd;
@@ -44,47 +27,23 @@ static tbui_frame_t *cpu_pane;
 static tbui_frame_t *disp_pane;
 static chip8emu *emu;
 
-
-void disp_pane_draw_content(tbui_widget_t *widget) {
-    uint8_t *buffer = emu->gfx;
-    int offset_x = widget->bound.x + 1;
-    int offset_y = widget->bound.y + 1;
-
-    for (int line = 0; line < 16; ++line) {
-        for (int x = 0; x < 64; ++x) {
-            int y = line * 2;
-            int y2 = y + 1;
-            if (buffer[y*64+x] != 0 && buffer[y2*64+x] != 0) {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[3], DISP_FG, DISP_BG);
-            } else if (buffer[y2*64+x] != 0) {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[2], DISP_FG, DISP_BG);
-            } else if (buffer[y*64+x] != 0) {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[1], DISP_FG, DISP_BG);
-            } else {
-                tb_change_cell(x + offset_x, line + offset_y, block_char[0], DISP_FG, DISP_BG);
-            }
-        }
-    }
-}
-
 void reg_pane_draw_content(tbui_widget_t *widget) {
     for (int i = 0; i < 16; ++i) {
-        tbui_printf(&widget->bound, 2, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
+        tbui_printf(widget, 2, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
     }
 }
 
 void cpu_pane_draw_content(tbui_widget_t *widget) {
-    tbui_bound_t* bound = &widget->bound;
-    tbui_printf(bound, 2, 1, 0, 0, "CLK");
-    tbui_printf(bound, 2, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
-    tbui_printf(bound, 2, 3, 0, 0, "  TMR %4dHz", chip8emu_get_timer_speed(emu));
+    tbui_printf(widget, 2, 1, 0, 0, "CLK");
+    tbui_printf(widget, 2, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
+    tbui_printf(widget, 2, 3, 0, 0, "  TMR %4dHz", chip8emu_get_timer_speed(emu));
 
-    tbui_printf(bound, 2, 4, 0, 0, "DT #%02X", emu->delay_timer);
-    tbui_printf(bound, 2, 5, 0, 0, "ST #%02X", emu->sound_timer);
+    tbui_printf(widget, 2, 4, 0, 0, "DT #%02X", emu->delay_timer);
+    tbui_printf(widget, 2, 5, 0, 0, "ST #%02X", emu->sound_timer);
 
-    tbui_printf(bound, 2, 6, 0, 0, "PC #%04X", emu->pc);
-    tbui_printf(bound, 2, 7, 0, 0, " I #%04X", emu->I);
-    tbui_printf(bound, 2, 8, 0, 0, "SP #%02X", emu->sp);
+    tbui_printf(widget, 2, 6, 0, 0, "PC #%04X", emu->pc);
+    tbui_printf(widget, 2, 7, 0, 0, " I #%04X", emu->I);
+    tbui_printf(widget, 2, 8, 0, 0, "SP #%02X", emu->sp);
 }
 
 void draw_keyboard() {
@@ -114,31 +73,55 @@ bool keystate_callback(uint8_t key) {
 
 int display_draw_thread(void *arg) {
     (void)arg;
+
+    /* setup UI widgets */
     tb_clear();
 
-    reg_pane = tbui_new_frame();
+    reg_pane = tbui_new_frame(NULL);
     reg_pane->title = "Registers";
     reg_pane->title_align = TBUI_ALIGN_LEFT;
-    reg_pane->widget->bound = (tbui_bound_t) {66, 0, 11, 18};
-    reg_pane->widget->visible = true;
-    reg_pane->widget->content_draw = &reg_pane_draw_content;
+    tbui_set_bound(reg_pane->widget, 66, 0, 11, 18);
+    tbui_set_visible(reg_pane->widget, true);
     tbui_append_child(NULL, reg_pane->widget);
+    reg_pane->widget->custom_draw = &reg_pane_draw_content;
 
-    cpu_pane = tbui_new_frame();
+    cpu_pane = tbui_new_frame(NULL);
     cpu_pane->title = "CPU";
     cpu_pane->title_align = TBUI_ALIGN_LEFT;
-    cpu_pane->widget->bound = (tbui_bound_t) {77, 0, 16, 18};
-    cpu_pane->widget->visible = true;
-    cpu_pane->widget->content_draw = &cpu_pane_draw_content;
+    tbui_set_bound(cpu_pane->widget, 77, 0, 16, 18);
+    tbui_set_visible(cpu_pane->widget, true);
     tbui_append_child(NULL, cpu_pane->widget);
+    cpu_pane->widget->custom_draw = &cpu_pane_draw_content;
 
-    disp_pane = tbui_new_frame();
+    disp_pane = tbui_new_frame(NULL);
     disp_pane->title = "Display";
     disp_pane->title_align = TBUI_ALIGN_LEFT;
-    disp_pane->widget->bound = (tbui_bound_t) {30, 18, 66, 18};
-    disp_pane->widget->visible = true;
-    disp_pane->widget->content_draw = &disp_pane_draw_content;
+    tbui_set_bound(disp_pane->widget, 0, 0, 66, 18);
+    tbui_set_visible(disp_pane->widget, true);
     tbui_append_child(NULL, disp_pane->widget);
+    {
+        tbui_monobitmap_t* disp_bitmap = tbui_new_monobitmap(disp_pane->widget);
+        tbui_set_bound(disp_bitmap->widget, 1, 1, 64, 16);
+        tbui_set_visible(disp_bitmap->widget, true);
+        tbui_append_child(disp_pane->widget, disp_bitmap->widget);
+        disp_bitmap->real_width = 64;
+        disp_bitmap->real_height = 32;
+        disp_bitmap->fg_color = DISP_FG;
+        disp_bitmap->bg_color = DISP_BG;
+        disp_bitmap->data = emu->gfx;
+
+        tbui_frame_t *pause_frame = tbui_new_frame(disp_pane->widget);
+        tbui_set_bound(pause_frame->widget, 28, 7, 10, 3);
+        tbui_set_visible(pause_frame->widget, false);
+        tbui_append_child(disp_pane->widget, pause_frame->widget);
+        {
+            tbui_label_t *lbl_pause = tbui_new_label(pause_frame->widget);
+            lbl_pause->text = " PAUSED ";
+            lbl_pause->widget->visible = true;
+            tbui_set_bound(lbl_pause->widget, 1, 1, 0xFF, 0xFF);
+            tbui_append_child(pause_frame->widget, lbl_pause->widget);
+        }
+    }
 
     tbui_redraw(NULL);
 
@@ -217,25 +200,13 @@ int keypad_thread(void *arg) {
             chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
             break;
         case 'p':
-            if (emu->paused)
+            if (emu->paused) {
+                disp_pane->widget->children[1]->visible = false;
+                tbui_redraw(NULL);
                 chip8emu_resume(emu);
-            else {
+            } else {
                 chip8emu_pause(emu);
-                tbui_frame_t *pause_frame = tbui_new_frame();
-                pause_frame->widget->bound = (tbui_bound_t) {28, 7, 10, 3};
-                pause_frame->widget->visible = true;
-                tbui_append_child(NULL, pause_frame->widget);
-
-                tbui_print(NULL, " PAUSED ", 29, 8, 0, 0);
-
-                tbui_frame_t *open_frame = tbui_new_frame();
-                open_frame->widget->bound = (tbui_bound_t) {28, 20, 30, 10};
-                open_frame->title = "Open ROMS";
-                open_frame->footnote = "(*) New slot";
-                open_frame->widget->visible = true;
-                open_frame->title_align = TBUI_ALIGN_RIGHT;
-                tbui_append_child(NULL, open_frame->widget);
-
+                disp_pane->widget->children[1]->visible = true;
                 tbui_redraw(NULL);
             }
             break;
