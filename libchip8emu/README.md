@@ -104,6 +104,7 @@ In your main loop, you could map keys to pause, resume, reset emulation through 
 Poor man's implementation:
 
 ```c
+#define CHIP8EMU_NO_THREAD
 #include "chip8emu.h"
 
 /* ... */
