@@ -11,9 +11,6 @@
 
 #include "chip8emu.h"
 
-#define DISPLAY_WIDTH   64
-#define DISPLAY_HEIGHT  16 /* x 2 */
-
 #define DISP_FG TB_CYAN
 #define DISP_BG TB_BLACK
 
@@ -78,7 +75,7 @@ int display_draw_thread(void *arg) {
     tb_clear();
 
     reg_pane = tbui_new_frame(NULL);
-    reg_pane->title = "Registers";
+    reg_pane->title = "[ REGS ]";
     reg_pane->title_align = TBUI_ALIGN_LEFT;
     tbui_set_bound(reg_pane->widget, 66, 0, 11, 18);
     tbui_set_visible(reg_pane->widget, true);
@@ -86,7 +83,7 @@ int display_draw_thread(void *arg) {
     reg_pane->widget->custom_draw = &reg_pane_draw_content;
 
     cpu_pane = tbui_new_frame(NULL);
-    cpu_pane->title = "CPU";
+    cpu_pane->title = "[ CPU ]";
     cpu_pane->title_align = TBUI_ALIGN_LEFT;
     tbui_set_bound(cpu_pane->widget, 77, 0, 16, 18);
     tbui_set_visible(cpu_pane->widget, true);
@@ -94,7 +91,7 @@ int display_draw_thread(void *arg) {
     cpu_pane->widget->custom_draw = &cpu_pane_draw_content;
 
     disp_pane = tbui_new_frame(NULL);
-    disp_pane->title = "Display";
+    disp_pane->title = "[ Display ]";
     disp_pane->title_align = TBUI_ALIGN_LEFT;
     tbui_set_bound(disp_pane->widget, 0, 0, 66, 18);
     tbui_set_visible(disp_pane->widget, true);
@@ -125,11 +122,25 @@ int display_draw_thread(void *arg) {
 
     tbui_redraw(NULL);
 
+    uint32_t start_time = (uint32_t)time(NULL);
+    uint32_t elapsed_time = (uint32_t)time(NULL) - start_time;
+    uint32_t frame_count = 0;
+    uint8_t fps = 0;
+    char *fps_str = calloc(sizeof (char), 40);
+    disp_pane->footnote = fps_str;
     while (true) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
-        tbui_redraw(NULL);
+        tbui_redraw(disp_pane->widget);
         tb_present();
+        frame_count++;
+        elapsed_time = (uint32_t)time(NULL) - start_time;
+        if (elapsed_time >= 3) {
+            fps = (uint8_t) (((float)frame_count / elapsed_time)+fps)/2;
+            sprintf(fps_str, "( %3d FPS )", fps);
+            start_time = (uint32_t)time(NULL);
+            frame_count = 0;
+        }
         mtx_unlock(&draw_mtx);
     }
 }
