@@ -27,7 +27,7 @@ cd dist/
 
 * chip8emu-fltk (planned)
 
-## [How to write your own](../libchip8emu#how-to-write-your-own-frontend)
+## [How to write your own](libchip8emu#how-to-write-your-own-frontend)
 
 
 ## Screencasts
