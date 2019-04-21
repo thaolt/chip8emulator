@@ -17,17 +17,17 @@ cd dist/
 
 ## Multiple front-ends
 
-### C99
+**C99**
 
 * chip8emu-termbox
 * chip8emu-sdl2
 * chip8emu-cdk (planned)
 
-### C++
+**C++**
 
 * chip8emu-fltk (planned)
 
-## [How to write your own](libchip8emu#how-to-write-your-own-frontend)
+[**How to write your own chip 8 emulator**](libchip8emu#how-to-write-your-own-frontend)
 
 
 ## Screencasts
