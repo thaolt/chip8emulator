@@ -13,5 +13,5 @@
 * GDI (planned)
 * X11 XLIB (planned)
 
-[**How to write your own frontend**](../libchip8emu)
+[**How to write your own frontend**](../libchip8emu#how-to-write-your-own-frontend)
 
