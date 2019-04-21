@@ -114,12 +114,16 @@ cpu->keystate = &keystate_callback;
 cpu->beep = &beep_callback;
 
 chip8emu_load_rom("/path/to/chip8rom.ch8");
-
+uint32_t cycles = 0;
 while (true) {
+    cycles++;
     chip8emu_exec_cycle(cpu);
+    if (!(cycles%8)) chip8emu_timer_tick(cpu);
     /* get user's key presses, e.g.: getchar() or SDL_GetKeyState .. */
     /* give some delay */
-    chip8emu_timer_tick(cpu);
 }
 /* ... */
 ```
+
+`if (!(cycles%8)) chip8emu_timer_tick(cpu);` means for 8 cpu cycles give one tick to timers. This won't get very far because the timing is completely wrong. However, it could help quickly test if we can load some ROMs and execute opcodes.
+
