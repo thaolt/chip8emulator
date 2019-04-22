@@ -102,7 +102,7 @@ long chip8emu_get_timer_speed(chip8emu *emu);
 
 /**
   * can be use with thread or without thread 
-  * do not use take_snapshot inside of any API callback function
+  * with threads: do not use take_snapshot inside of any API callback function
   * it's very likely to create thread deadlocks
   **/
 void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot* snapshot);
