@@ -83,8 +83,6 @@ int chip8emu_load_rom(chip8emu* emu, const char* filename);
 void chip8emu_exec_cycle(chip8emu *emu);
 void chip8emu_timer_tick(chip8emu *emu);
 
-
-
 #ifndef CHIP8EMU_NO_THREAD
 /* */
 void chip8emu_start(chip8emu *emu);
@@ -97,8 +95,10 @@ long chip8emu_get_cpu_speed(chip8emu *emu);
 void chip8emu_set_timer_speed(chip8emu *emu, long speed_in_hz);
 long chip8emu_get_timer_speed(chip8emu *emu);
 
-void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot* snapshot);
 #endif /* CHIP8EMU_NO_THREAD */
+
+/* can be use with thread or without thread */
+void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot* snapshot);
 
 #ifdef __cplusplus
 }

@@ -11,10 +11,10 @@ static int keymap[16] = {
     SDLK_KP_1,
     SDLK_KP_2,
     SDLK_KP_3,
-    SDLK_KP_4,
-    SDLK_KP_5,
-    SDLK_KP_6,
-    SDLK_KP_7,
+    SDLK_UP,
+    SDLK_LEFT,
+    SDLK_RIGHT,
+    SDLK_DOWN,
     SDLK_KP_8,
     SDLK_KP_9,
     SDLK_KP_ENTER,
@@ -31,26 +31,28 @@ static cnd_t draw_cnd;
 
 static bool keystates[16] = {0};
 
-void draw_callback(chip8emu *emu) {
-    (void)emu;
+void draw_callback(chip8emu *cpu) {
+    (void)cpu;
     mtx_lock(&draw_mtx);
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
 
-bool keystate_callback(uint8_t key) {
+bool keystate_callback(chip8emu* cpu, uint8_t key) {
+    (void)cpu;
     mtx_lock(&key_mtx);
     bool ret = keystates[key];
     mtx_unlock(&key_mtx);
     return ret;
 }
 
-void beep_callback() {
-
+void beep_callback(chip8emu * cpu) {
+    (void)cpu;
 }
 
 int keypad_thread(void *arg) {
-    chip8emu * cpu = (chip8emu*) arg;
+//    chip8emu * cpu = (chip8emu*) arg;
+    (void)arg;
 
     SDL_Event e;
     bool quit = false;
@@ -162,7 +164,7 @@ int main(int argc, char **argv) {
 
     chip8emu* cpu= chip8emu_new();
     cpu->draw = &draw_callback;
-    cpu->keystate= &keystate_callback;
+    cpu->keystate = &keystate_callback;
     cpu->beep = &beep_callback;
 
     thrd_t thrd_draw;

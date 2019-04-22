@@ -56,7 +56,6 @@ void beep_callback() {
 void draw_callback(chip8emu *emu) {
     (void)emu;
     mtx_lock(&draw_mtx);
-    chip8emu_take_snapshot(emu, &snapshot);
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
@@ -138,13 +137,14 @@ int display_draw_thread(void *arg) {
     while (true) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
+        chip8emu_take_snapshot(emu, &snapshot);
         tbui_redraw(NULL);
         tb_present();
         frame_count++;
         elapsed_time = (uint32_t)time(NULL) - start_time;
         if (elapsed_time >= 3) {
             fps = (uint8_t) (((float)frame_count / elapsed_time)+fps)/2;
-            sprintf(fps_str, "( %3d FPS )", fps);
+            sprintf(fps_str, "( %d FPS )", fps);
             start_time = (uint32_t)time(NULL);
             frame_count = 0;
         }

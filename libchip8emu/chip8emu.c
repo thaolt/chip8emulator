@@ -484,9 +484,9 @@ static int chip8emu_thread_clk_timers(void *arg) {
             cnd_wait(emu->cnd_resume_timers, emu->mtx_pause);
         mtx_unlock(emu->mtx_pause);
 
-        mtx_lock(emu->mtx_cpu);
+        mtx_lock(emu->mtx_timers);
         cnd_signal(emu->cnd_clk_timers);
-        mtx_unlock(emu->mtx_cpu);
+        mtx_unlock(emu->mtx_timers);
 
         thrd_sleep(emu->_timer_clk_delay, 0);
     }
@@ -500,10 +500,13 @@ static int chip8emu_thread_clk_cpu(void *arg) {
             cnd_wait(emu->cnd_resume_cpu, emu->mtx_pause);
         mtx_unlock(emu->mtx_pause);
 
-        thrd_sleep(emu->_cpu_clk_delay, 0);
         mtx_lock(emu->mtx_timers);
+        mtx_lock(emu->mtx_cpu);
         cnd_signal(emu->cnd_clk_cpu);
+        mtx_unlock(emu->mtx_cpu);
         mtx_unlock(emu->mtx_timers);
+
+        thrd_sleep(emu->_cpu_clk_delay, 0);
     }
 }
 
@@ -627,12 +630,13 @@ long chip8emu_get_timer_speed(chip8emu *emu)
     mtx_unlock(emu->mtx_timers);
     return speed_in_hz;
 }
-
-
 #endif /* CHIP8EMU_NO_THREAD */
 
 void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot *snapshot)
 {
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_lock(emu->mtx_cpu);
+#endif /* CHIP8EMU_NO_THREAD */
     memcpy(snapshot->memory, emu->memory, 4096);
     memcpy(snapshot->gfx, emu->gfx, 2048);
     memcpy(snapshot->V, emu->V, 16);
@@ -641,6 +645,14 @@ void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot *snapshot)
     snapshot->sp = emu->sp;
     snapshot->I = emu->I;
     snapshot->pc = emu->pc;
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_unlock(emu->mtx_cpu);
+//    mtx_lock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
     snapshot->delay_timer = emu->delay_timer;
     snapshot->sound_timer = emu->sound_timer;
+#ifndef CHIP8EMU_NO_THREAD
+//    mtx_unlock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
 }
+
