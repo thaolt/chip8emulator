@@ -18,7 +18,7 @@
 static mtx_t draw_mtx;
 static cnd_t draw_cnd;
 static uint8_t keybuffer[0x10] = {0};
-static uint8_t disp_buffer[64*32] = {0};
+static chip8emu_snapshot snapshot;
 
 static tbui_frame_t *reg_pane;
 static tbui_frame_t *cpu_pane;
@@ -36,12 +36,12 @@ void cpu_pane_draw_content(tbui_widget_t *widget) {
     tbui_printf(widget, 2, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
     tbui_printf(widget, 2, 3, 0, 0, "  TMR %4dHz", chip8emu_get_timer_speed(emu));
 
-    tbui_printf(widget, 2, 4, 0, 0, "DT #%02X", emu->delay_timer);
-    tbui_printf(widget, 2, 5, 0, 0, "ST #%02X", emu->sound_timer);
+    tbui_printf(widget, 2, 4, 0, 0, "DT #%02X", snapshot.delay_timer);
+    tbui_printf(widget, 2, 5, 0, 0, "ST #%02X", snapshot.sound_timer);
 
-    tbui_printf(widget, 2, 6, 0, 0, "PC #%04X", emu->pc);
-    tbui_printf(widget, 2, 7, 0, 0, " I #%04X", emu->I);
-    tbui_printf(widget, 2, 8, 0, 0, "SP #%02X", emu->sp);
+    tbui_printf(widget, 2, 6, 0, 0, "PC #%04X", snapshot.pc);
+    tbui_printf(widget, 2, 7, 0, 0, " I #%04X", snapshot.I);
+    tbui_printf(widget, 2, 8, 0, 0, "SP #%02X", snapshot.sp);
 }
 
 void draw_keyboard() {
@@ -56,12 +56,13 @@ void beep_callback() {
 void draw_callback(chip8emu *emu) {
     (void)emu;
     mtx_lock(&draw_mtx);
-    memcpy(disp_buffer, emu->gfx, 64*32);
+    chip8emu_take_snapshot(emu, &snapshot);
     cnd_signal(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
 
-bool keystate_callback(uint8_t key) {
+bool keystate_callback(chip8emu *emu, uint8_t key) {
+    (void)emu;
     bool ret;
     if (keybuffer[key] > 3) keybuffer[key] = 3;
     ret = keybuffer[key] > 0;
@@ -104,7 +105,7 @@ static void setup_ui() {
         disp_bitmap->real_height = 32;
         disp_bitmap->fg_color = DISP_FG;
         disp_bitmap->bg_color = DISP_BG;
-        disp_bitmap->data = disp_buffer;
+        disp_bitmap->data = snapshot.gfx;
 
         tbui_frame_t *pause_frame = tbui_new_frame(disp_pane->widget);
         tbui_set_bound(pause_frame->widget, 28, 7, 10, 3);
@@ -137,7 +138,7 @@ int display_draw_thread(void *arg) {
     while (true) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
-        tbui_redraw(disp_pane->widget);
+        tbui_redraw(NULL);
         tb_present();
         frame_count++;
         elapsed_time = (uint32_t)time(NULL) - start_time;
@@ -249,8 +250,8 @@ int main(int argc, char **argv) {
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/worm.ch8");
-    chip8emu_set_cpu_speed(emu, 500);
+    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_set_cpu_speed(emu, 1200);
     chip8emu_start(emu);
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
