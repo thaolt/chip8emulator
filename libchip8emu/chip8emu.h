@@ -45,7 +45,10 @@ struct chip8emu
     uint16_t  stack[16];
     uint16_t  sp;           /* stack pointer */
 
-    int  (*opcode_handlers[16])(chip8emu *);
+    /* opcode handling functions, can be overrided */
+    int  (*opcode_handlers[0x10])(chip8emu *);
+    
+    /* API callbacks */
     void (*draw)(chip8emu *);
     bool (*keystate)(chip8emu *, uint8_t);
     void (*beep)(chip8emu *);
@@ -97,7 +100,11 @@ long chip8emu_get_timer_speed(chip8emu *emu);
 
 #endif /* CHIP8EMU_NO_THREAD */
 
-/* can be use with thread or without thread */
+/**
+  * can be use with thread or without thread 
+  * do not use take_snapshot inside of any API callback function
+  * it's very likely to create thread deadlocks
+  **/
 void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot* snapshot);
 
 #ifdef __cplusplus
