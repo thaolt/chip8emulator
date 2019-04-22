@@ -1,4 +1,4 @@
-# chip8emu
+# chip8emu library
 
 A lightweight, cross platform, C99 implementation of CHIP8 emulation library
 
@@ -27,7 +27,7 @@ cd dist/
 
 * chip8emu-fltk (planned)
 
-[**How to write your own chip 8 emulator**](libchip8emu#how-to-write-your-own-frontend)
+[**How to write your own chip 8 emulator**](libchip8emu#how-to-write-your-own-emulator)
 
 
 ## Screencasts
@@ -56,3 +56,5 @@ Thanks to authors of the articles which help me writing this library
 * http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
 * http://en.wikipedia.org/wiki/CHIP-8
 * http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+
+Specials thanks to the [Awesome C](https://github.com/kozross/awesome-c) listing. It's an awesome list of awesome open-source software and libraries written in C, yeah that's a lot of awesome. It was where I found libraries that used in libchip8emu, everyone should check it out.
