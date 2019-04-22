@@ -53,6 +53,7 @@ struct tbui_frame_t {
     const char* footnote;
     border_style_t border_style;
     tbui_alignment_t title_align;
+    tbui_alignment_t footnote_align;
     tbui_widget_t* widget;
 };
 

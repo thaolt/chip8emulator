@@ -138,8 +138,22 @@ static void _draw_frame(tbui_widget_t* widget) {
         }
     }
 
-    if (frame->footnote && strlen(frame->footnote) > 0) {
-        tbui_print(widget, frame->footnote, 1, h - 1, 0, 0);
+    if (frame->footnote) {
+        uint8_t footnote_len = (uint8_t) strlen(frame->footnote);
+        if (footnote_len) {
+            switch (frame->footnote_align) {
+            case TBUI_ALIGN_LEFT:
+                tbui_print(widget, frame->footnote, 1, h - 1, 0, 0);
+                break;
+            case TBUI_ALIGN_CENTER:
+                tbui_print(widget, frame->footnote,
+                           w/2 - footnote_len/2 - footnote_len%2, h - 1, 0, 0);
+                break;
+            case TBUI_ALIGN_RIGHT:
+                tbui_print(widget, frame->footnote, w - 1 - footnote_len, h - 1, 0, 0);
+                break;
+            }
+        }
     }
 
     if (widget->custom_draw) widget->custom_draw(widget);

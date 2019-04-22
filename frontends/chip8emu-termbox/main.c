@@ -20,18 +20,14 @@ static cnd_t draw_cnd;
 static uint8_t keybuffer[0x10] = {0};
 static chip8emu_snapshot snapshot;
 
-static tbui_frame_t *reg_pane;
 static tbui_frame_t *cpu_pane;
 static tbui_frame_t *disp_pane;
 static chip8emu *emu;
 
-void reg_pane_draw_content(tbui_widget_t *widget) {
-    for (int i = 0; i < 16; ++i) {
-        tbui_printf(widget, 2, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
-    }
-}
-
 void cpu_pane_draw_content(tbui_widget_t *widget) {
+    for (int i = 0; i < 16; ++i) {
+        tbui_printf(widget, 18, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
+    }
     tbui_printf(widget, 2, 1, 0, 0, "CLK");
     tbui_printf(widget, 2, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
     tbui_printf(widget, 2, 3, 0, 0, "  TMR %4dHz", chip8emu_get_timer_speed(emu));
@@ -73,18 +69,10 @@ static void setup_ui() {
     /* setup UI widgets */
     tb_clear();
 
-    reg_pane = tbui_new_frame(NULL);
-    reg_pane->title = "[ REGS ]";
-    reg_pane->title_align = TBUI_ALIGN_LEFT;
-    tbui_set_bound(reg_pane->widget, 66, 0, 11, 18);
-    tbui_set_visible(reg_pane->widget, true);
-    tbui_append_child(NULL, reg_pane->widget);
-    reg_pane->widget->custom_draw = &reg_pane_draw_content;
-
     cpu_pane = tbui_new_frame(NULL);
     cpu_pane->title = "[ CPU ]";
     cpu_pane->title_align = TBUI_ALIGN_LEFT;
-    tbui_set_bound(cpu_pane->widget, 77, 0, 16, 18);
+    tbui_set_bound(cpu_pane->widget, 66, 0, 27, 18);
     tbui_set_visible(cpu_pane->widget, true);
     tbui_append_child(NULL, cpu_pane->widget);
     cpu_pane->widget->custom_draw = &cpu_pane_draw_content;
@@ -92,6 +80,7 @@ static void setup_ui() {
     disp_pane = tbui_new_frame(NULL);
     disp_pane->title = "[ Display ]";
     disp_pane->title_align = TBUI_ALIGN_LEFT;
+    disp_pane->footnote_align = TBUI_ALIGN_RIGHT;
     tbui_set_bound(disp_pane->widget, 0, 0, 66, 18);
     tbui_set_visible(disp_pane->widget, true);
     tbui_append_child(NULL, disp_pane->widget);
