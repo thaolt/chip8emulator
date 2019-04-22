@@ -56,3 +56,5 @@ Thanks to authors of the articles which help me writing this library
 * http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
 * http://en.wikipedia.org/wiki/CHIP-8
 * http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+
+Specials thanks to the [Awesome C](https://github.com/kozross/awesome-c) listing. It's an awesome list of awesome software and libraries written in C, yeah that's a lot of awesome. It is where I found libraries that used in libchip8emu, everyone should check it out.
