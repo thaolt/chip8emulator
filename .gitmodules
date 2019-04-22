@@ -16,3 +16,6 @@
 [submodule "3rdparty/Collections-C"]
 	path = 3rdparty/Collections-C
 	url = https://github.com/srdja/Collections-C.git
+[submodule "3rdparty/libucl"]
+	path = 3rdparty/libucl
+	url = https://github.com/vstakhov/libucl.git
