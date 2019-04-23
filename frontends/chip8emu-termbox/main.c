@@ -13,13 +13,15 @@
 
 #define DISP_FG TB_CYAN
 #define DISP_BG TB_BLACK
-
+#define CONTAINER_WIDTH 92
+#define CONTAINER_MIN_HEIGHT 25
 
 static mtx_t draw_mtx;
 static cnd_t draw_cnd;
 static uint8_t keybuffer[0x10] = {0};
 static chip8emu_snapshot snapshot;
 
+static tbui_widget_t * container;
 static tbui_frame_t *cpu_pane;
 static tbui_frame_t *disp_pane;
 static chip8emu *emu;
@@ -69,10 +71,10 @@ static void setup_ui() {
     /* setup UI widgets */
     tb_clear();
 
-    const int container_w = 92;
-
-    tbui_widget_t * container = tbui_new_widget(NULL);
-    tbui_set_bound(container, tb_width()/2 - container_w/2, 0, container_w, tb_height());
+    container = tbui_new_widget(NULL);
+    tbui_set_bound(container,
+        tb_width()/2 - CONTAINER_WIDTH/2 - CONTAINER_WIDTH%2,
+        0, CONTAINER_WIDTH, tb_height());
     tbui_set_visible(container, true);
     tbui_child_append(NULL, container);
 
@@ -154,97 +156,109 @@ int keypad_thread(void *arg) {
     bool quit = false;
     struct tb_event ev;
     while (!quit) {
-    tb_poll_event(&ev);
-	if (ev.type == TB_EVENT_KEY)
-        switch (ev.key) {
-        case TB_KEY_CTRL_O:
-            break;
-        case TB_KEY_CTRL_X:
-            quit = true;
-            break;
-        case TB_KEY_CTRL_R:
-            chip8emu_reset(emu);
-            break;
-        case TB_KEY_CTRL_RSQ_BRACKET:
-            chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) + 100);
-            break;
-        case TB_KEY_CTRL_LSQ_BRACKET:
-            chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
-            break;
-        case TB_KEY_CTRL_P:
-            if (emu->paused) {
-                disp_pane->widget->children[1]->visible = false;
-                tbui_redraw(NULL);
-                chip8emu_resume(emu);
-            } else {
-                chip8emu_pause(emu);
-                disp_pane->widget->children[1]->visible = true;
-                tbui_redraw(NULL);
-            }
-            break;
-        case TB_KEY_ARROW_UP:
-            keybuffer[0x4]++;
-            break;
-        case TB_KEY_ARROW_DOWN:
-            keybuffer[0x7]++;
-            break;
-        case TB_KEY_ARROW_LEFT:
-            keybuffer[0x5]++;
-            break;
-        case TB_KEY_ARROW_RIGHT:
-            keybuffer[0x6]++;
-            break;
-        default:
-            switch (ev.ch) {
-            case '0':
-                keybuffer[0x0]++;
+        tb_poll_event(&ev);
+        if (ev.type == TB_EVENT_KEY)
+            switch (ev.key) {
+            case TB_KEY_CTRL_O:
                 break;
-            case '1':
-                keybuffer[0x1]++;
+            case TB_KEY_CTRL_X:
+                quit = true;
                 break;
-            case '2':
-                keybuffer[0x2]++;
+            case TB_KEY_CTRL_R:
+                chip8emu_reset(emu);
                 break;
-            case '3':
-                keybuffer[0x3]++;
+            case TB_KEY_CTRL_RSQ_BRACKET:
+                chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) + 100);
                 break;
-            case '4':
+            case TB_KEY_CTRL_LSQ_BRACKET:
+                chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
+                break;
+            case TB_KEY_SPACE:
+                if (emu->paused) {
+                    disp_pane->widget->children[1]->visible = false;
+                    tbui_redraw(NULL);
+                    chip8emu_resume(emu);
+                } else {
+                    chip8emu_pause(emu);
+                    disp_pane->widget->children[1]->visible = true;
+                    tbui_redraw(NULL);
+                }
+                break;
+            case TB_KEY_ARROW_UP:
                 keybuffer[0x4]++;
                 break;
-            case '5':
-                keybuffer[0x5]++;
-                break;
-            case '6':
-                keybuffer[0x6]++;
-                break;
-            case '7':
+            case TB_KEY_ARROW_DOWN:
                 keybuffer[0x7]++;
                 break;
-            case '8':
-                keybuffer[0x8]++;
+            case TB_KEY_ARROW_LEFT:
+                keybuffer[0x5]++;
                 break;
-            case '9':
-                keybuffer[0x9]++;
+            case TB_KEY_ARROW_RIGHT:
+                keybuffer[0x6]++;
                 break;
-            case '+':
-                keybuffer[0xB]++;
-                break;
-            case '-':
-                keybuffer[0xC]++;
-                break;
-            case '*':
-                keybuffer[0xD]++;
-                break;
-            case '/':
-                keybuffer[0xE]++;
-                break;
-            case '.':
-                keybuffer[0xF]++;
+            default:
+                switch (ev.ch) {
+                case '0':
+                    keybuffer[0x0]++;
+                    break;
+                case '1':
+                    keybuffer[0x1]++;
+                    break;
+                case '2':
+                    keybuffer[0x2]++;
+                    break;
+                case '3':
+                    keybuffer[0x3]++;
+                    break;
+                case '4':
+                    keybuffer[0x4]++;
+                    break;
+                case '5':
+                    keybuffer[0x5]++;
+                    break;
+                case '6':
+                    keybuffer[0x6]++;
+                    break;
+                case '7':
+                    keybuffer[0x7]++;
+                    break;
+                case '8':
+                    keybuffer[0x8]++;
+                    break;
+                case '9':
+                    keybuffer[0x9]++;
+                    break;
+                case '+':
+                    keybuffer[0xB]++;
+                    break;
+                case '-':
+                    keybuffer[0xC]++;
+                    break;
+                case '*':
+                    keybuffer[0xD]++;
+                    break;
+                case '/':
+                    keybuffer[0xE]++;
+                    break;
+                case '.':
+                    keybuffer[0xF]++;
+                    break;
+                }
                 break;
             }
-            break;
-        }
 
+        if (ev.type == TB_EVENT_RESIZE) {
+            mtx_lock(&draw_mtx);
+            tbui_set_bound(
+                container,
+                tb_width()/2 - CONTAINER_WIDTH/2 - CONTAINER_WIDTH%2,
+                0,
+                CONTAINER_WIDTH,
+                tb_height()
+            );
+            tb_clear(); tbui_redraw(NULL);
+            mtx_unlock(&draw_mtx);
+        }
     }
     return 0;
 }
@@ -257,6 +271,13 @@ int main(int argc, char **argv) {
         log_error("tb_init() failed with error code %d\n", ret);
         return 1;
     }
+
+    /*
+    if (tb_width() < CONTAINER_WIDTH || tb_height() < CONTAINER_MIN_HEIGHT) {
+        log_error("terminal geometry (width x height) has to be at least 92x25 column.");
+        goto quit;
+    }
+    */
 
     emu = chip8emu_new();
     emu->draw = &draw_callback;
