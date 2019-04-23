@@ -10,8 +10,9 @@
     docker_image_name: "rikorose/gcc-cmake"
     docker_image_tag: "latest"
     execute_commands:
-    - "mkdir build "
-    - "cd build"
+    - "rm -rf build/"
+    - "mkdir build"
+    - "cd build/"
     - "cmake .."
     - "cmake --build ."
     setup_commands:
