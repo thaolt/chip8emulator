@@ -5,11 +5,8 @@ git:
 dist: xenial
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
     packages:
-      - g++-6
       - libsdl2-dev
 script:
   - mkdir build && cd build
-  - CXX=/usr/bin/g++-6 CC=/usr/bin/gcc-6 cmake .. && cmake --build .
+  - cmake .. && cmake --build .
