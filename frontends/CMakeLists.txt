@@ -4,5 +4,5 @@ project(frontends)
 
 add_subdirectory(chip8emu-termbox)
 add_subdirectory(chip8emu-cdk)
-add_subdirectory(chip8emu-sdl2)
+
 
