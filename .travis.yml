@@ -2,7 +2,7 @@ language: c
 sudo: false
 git:
   depth: 3
-dist: xenial
+dist: trusty
 addons:
   apt:
     packages:
