@@ -1,0 +1,14 @@
+version: 0.9.{build}
+image: Previous Ubuntu1804
+clone_depth: 3
+build_script:
+- sh: >-
+    git submodule update --init
+
+    mkdir build
+
+    cd build
+
+    cmake ..
+
+    cmake --build .

@@ -1,0 +1,22 @@
+- pipeline: "build"
+  trigger_mode: "ON_EVERY_PUSH"
+  ref_name: "master"
+  ref_type: "BRANCH"
+  trigger_condition: "ALWAYS"
+  actions:
+  - action: "Execute: cmake --build ."
+    type: "BUILD"
+    working_directory: "/buddy/chip8emulator"
+    docker_image_name: "rikorose/gcc-cmake"
+    docker_image_tag: "latest"
+    execute_commands:
+    - "mkdir build "
+    - "cd build"
+    - "cmake .."
+    - "cmake --build ."
+    setup_commands:
+    - "apt-get update"
+    - "apt-get -yq install libsdl2-dev"
+    mount_filesystem_path: "/buddy/chip8emulator"
+    shell: "BASH"
+    trigger_condition: "ALWAYS"
