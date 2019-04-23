@@ -23,3 +23,5 @@ target_link_libraries(${PROJECT_NAME}
     libsoundio_static ${LIBSOUNDIO_LIBS} 
     ${LIBM}
 )
+
+
