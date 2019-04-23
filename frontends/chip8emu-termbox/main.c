@@ -26,7 +26,7 @@ static chip8emu *emu;
 
 void cpu_pane_draw_content(tbui_widget_t *widget) {
     for (int i = 0; i < 16; ++i) {
-        tbui_printf(widget, 18, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
+        tbui_printf(widget, 17, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
     }
     tbui_printf(widget, 2, 1, 0, 0, "CLK");
     tbui_printf(widget, 2, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
@@ -59,7 +59,7 @@ void draw_callback(chip8emu *emu) {
 bool keystate_callback(chip8emu *emu, uint8_t key) {
     (void)emu;
     bool ret;
-    if (keybuffer[key] > 3) keybuffer[key] = 3;
+    if (keybuffer[key] > 1) keybuffer[key] = 2;
     ret = keybuffer[key] > 0;
     if (ret) keybuffer[key]--;
     return ret;
@@ -69,12 +69,19 @@ static void setup_ui() {
     /* setup UI widgets */
     tb_clear();
 
-    cpu_pane = tbui_new_frame(NULL);
+    const int container_w = 92;
+
+    tbui_widget_t * container = tbui_new_widget(NULL);
+    tbui_set_bound(container, tb_width()/2 - container_w/2, 0, container_w, tb_height());
+    tbui_set_visible(container, true);
+    tbui_child_append(NULL, container);
+
+    cpu_pane = tbui_new_frame(container);
     cpu_pane->title = "[ CPU ]";
     cpu_pane->title_align = TBUI_ALIGN_LEFT;
-    tbui_set_bound(cpu_pane->widget, 66, 0, 27, 18);
+    tbui_set_bound(cpu_pane->widget, 66, 0, 26, 18);
     tbui_set_visible(cpu_pane->widget, true);
-    tbui_append_child(NULL, cpu_pane->widget);
+    tbui_child_append(container, cpu_pane->widget);
     cpu_pane->widget->custom_draw = &cpu_pane_draw_content;
 
     disp_pane = tbui_new_frame(NULL);
@@ -83,14 +90,15 @@ static void setup_ui() {
     disp_pane->footnote_align = TBUI_ALIGN_RIGHT;
     tbui_set_bound(disp_pane->widget, 0, 0, 66, 18);
     tbui_set_visible(disp_pane->widget, true);
-    tbui_append_child(NULL, disp_pane->widget);
+    tbui_child_append(container, disp_pane->widget);
     {
         tbui_monobitmap_t* disp_bitmap = tbui_new_monobitmap(disp_pane->widget);
         tbui_set_bound(disp_bitmap->widget, 1, 1, 64, 16);
         tbui_set_visible(disp_bitmap->widget, true);
-        tbui_append_child(disp_pane->widget, disp_bitmap->widget);
+        tbui_child_append(disp_pane->widget, disp_bitmap->widget);
         disp_bitmap->real_width = 64;
         disp_bitmap->real_height = 32;
+        disp_bitmap->bitmap_style = TBUI_BITMAP_HALF_BLOCK;
         disp_bitmap->fg_color = DISP_FG;
         disp_bitmap->bg_color = DISP_BG;
         disp_bitmap->data = snapshot.gfx;
@@ -98,13 +106,13 @@ static void setup_ui() {
         tbui_frame_t *pause_frame = tbui_new_frame(disp_pane->widget);
         tbui_set_bound(pause_frame->widget, 28, 7, 10, 3);
         tbui_set_visible(pause_frame->widget, false);
-        tbui_append_child(disp_pane->widget, pause_frame->widget);
+        tbui_child_append(disp_pane->widget, pause_frame->widget);
         {
             tbui_label_t *lbl_pause = tbui_new_label(pause_frame->widget);
             lbl_pause->text = " PAUSED ";
             lbl_pause->widget->visible = true;
             tbui_set_bound(lbl_pause->widget, 1, 1, 0xFF, 0xFF);
-            tbui_append_child(pause_frame->widget, lbl_pause->widget);
+            tbui_child_append(pause_frame->widget, lbl_pause->widget);
         }
     }
 
@@ -146,67 +154,24 @@ int keypad_thread(void *arg) {
     bool quit = false;
     struct tb_event ev;
     while (!quit) {
-	tb_peek_event(&ev, 10);
+    tb_poll_event(&ev);
 	if (ev.type == TB_EVENT_KEY)
-        switch (ev.ch) {
-        case '0':
-            keybuffer[0x0]++;
+        switch (ev.key) {
+        case TB_KEY_CTRL_O:
             break;
-        case '1':
-            keybuffer[0x1]++;
-            break;
-        case '2':
-            keybuffer[0x2]++;
-            break;
-        case '3':
-            keybuffer[0x3]++;
-            break;
-        case '4':
-            keybuffer[0x4]++;
-            break;
-        case '5':
-            keybuffer[0x5]++;
-            break;
-        case '6':
-            keybuffer[0x6]++;
-            break;
-        case '7':
-            keybuffer[0x7]++;
-            break;
-        case '8':
-            keybuffer[0x8]++;
-            break;
-        case '9':
-            keybuffer[0x9]++;
-            break;
-        case '+':
-            keybuffer[0xB]++;
-            break;
-        case '-':
-            keybuffer[0xC]++;
-            break;
-        case '*':
-            keybuffer[0xD]++;
-            break;
-        case '/':
-            keybuffer[0xE]++;
-            break;
-        case '.':
-            keybuffer[0xF]++;
-            break;
-        case 'q':
+        case TB_KEY_CTRL_X:
             quit = true;
             break;
-        case 'r':
+        case TB_KEY_CTRL_R:
             chip8emu_reset(emu);
             break;
-        case ']':
+        case TB_KEY_CTRL_RSQ_BRACKET:
             chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) + 100);
             break;
-        case '[':
+        case TB_KEY_CTRL_LSQ_BRACKET:
             chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
             break;
-        case 'p':
+        case TB_KEY_CTRL_P:
             if (emu->paused) {
                 disp_pane->widget->children[1]->visible = false;
                 tbui_redraw(NULL);
@@ -217,7 +182,69 @@ int keypad_thread(void *arg) {
                 tbui_redraw(NULL);
             }
             break;
+        case TB_KEY_ARROW_UP:
+            keybuffer[0x4]++;
+            break;
+        case TB_KEY_ARROW_DOWN:
+            keybuffer[0x7]++;
+            break;
+        case TB_KEY_ARROW_LEFT:
+            keybuffer[0x5]++;
+            break;
+        case TB_KEY_ARROW_RIGHT:
+            keybuffer[0x6]++;
+            break;
+        default:
+            switch (ev.ch) {
+            case '0':
+                keybuffer[0x0]++;
+                break;
+            case '1':
+                keybuffer[0x1]++;
+                break;
+            case '2':
+                keybuffer[0x2]++;
+                break;
+            case '3':
+                keybuffer[0x3]++;
+                break;
+            case '4':
+                keybuffer[0x4]++;
+                break;
+            case '5':
+                keybuffer[0x5]++;
+                break;
+            case '6':
+                keybuffer[0x6]++;
+                break;
+            case '7':
+                keybuffer[0x7]++;
+                break;
+            case '8':
+                keybuffer[0x8]++;
+                break;
+            case '9':
+                keybuffer[0x9]++;
+                break;
+            case '+':
+                keybuffer[0xB]++;
+                break;
+            case '-':
+                keybuffer[0xC]++;
+                break;
+            case '*':
+                keybuffer[0xD]++;
+                break;
+            case '/':
+                keybuffer[0xE]++;
+                break;
+            case '.':
+                keybuffer[0xF]++;
+                break;
+            }
+            break;
         }
+
     }
     return 0;
 }

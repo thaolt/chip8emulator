@@ -79,6 +79,8 @@ static uint8_t chip8_fontset[80] =
 chip8emu *chip8emu_new(void)
 {
     chip8emu* emu = malloc(sizeof (chip8emu));
+    /* Intializes random number generator */
+    srand((unsigned) time(NULL));
 
     emu->pc     = 0x200;  /* Program counter starts at 0x200 */
     emu->opcode = 0;      /* Reset current opcode */

@@ -4,11 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 
 #include "termbox.h"
 
 
-static tbui_widget_t _root_widget;
+static tbui_widget_t* _root_widget;
 
 static const uint32_t box_drawing[] = {
 /*0*/    0x250C, /* ┌ */
@@ -50,25 +51,37 @@ static void _draw_widget_dummy(tbui_widget_t* widget) {
     (void)widget;
 }
 
+static void _widget_dtor_dummy(tbui_widget_t* widget) {
+    (void)widget;
+}
+
+static void _frame_dtor(tbui_widget_t* widget) {
+    tbui_frame_t* frame = widget->impl;
+    free(frame);
+    widget->impl = NULL;
+}
+
 int tbui_init()
 {
-    _root_widget.visible = true;
-    _root_widget.children = 0;
-    _root_widget.children_count = 0;
-    _root_widget.draw = &_draw_widget_dummy;
-    _root_widget.custom_draw = 0;
-    _root_widget.bound = malloc(sizeof (tbui_bound_t));
-    _root_widget.bound->x = 0;
-    _root_widget.bound->y = 0;
-    _root_widget.bound->w = tb_width();
-    _root_widget.bound->h = tb_height();
-    _root_widget.parent = 0;
+    _root_widget = malloc(sizeof (tbui_widget_t));
+    _root_widget->visible = true;
+    _root_widget->children = NULL;
+    _root_widget->children_count = 0;
+    _root_widget->draw = &_draw_widget_dummy;
+    _root_widget->dtor = &_widget_dtor_dummy;
+    _root_widget->custom_draw = 0;
+    _root_widget->bound = malloc(sizeof (tbui_bound_t));
+    _root_widget->bound->x = 0;
+    _root_widget->bound->y = 0;
+    _root_widget->bound->w = tb_width();
+    _root_widget->bound->h = tb_height();
+    _root_widget->parent = NULL;
     return tb_init();
 }
 
 void tbui_change_cell(tbui_widget_t* widget, int x, int y, uint32_t ch, uint16_t fg, uint16_t bg)
 {
-    if (!widget) widget = &(_root_widget);
+    if (!widget) widget = _root_widget;
 
     tbui_bound_t * real_bound = tbui_real_bound(widget);
 
@@ -80,7 +93,7 @@ void tbui_change_cell(tbui_widget_t* widget, int x, int y, uint32_t ch, uint16_t
 
 void tbui_print(tbui_widget_t *widget, const char *str, int x, int y, uint16_t fg, uint16_t bg)
 {
-    if (!widget) widget = &(_root_widget);
+    if (!widget) widget = (_root_widget);
     while (*str) {
         uint32_t uni;
         str += tb_utf8_char_to_unicode(&uni, str);
@@ -92,7 +105,7 @@ void tbui_print(tbui_widget_t *widget, const char *str, int x, int y, uint16_t f
 
 void tbui_printf(tbui_widget_t* widget, int x, int y, uint16_t fg, uint16_t bg, const char *fmt, ...)
 {
-    if (!widget) widget = &(_root_widget);
+    if (!widget) widget = (_root_widget);
     char buf[4096];
     va_list vl;
     va_start(vl, fmt);
@@ -163,7 +176,7 @@ static void _draw_frame(tbui_widget_t* widget) {
 void tbui_redraw(tbui_widget_t* widget)
 {
     if (!widget) {
-        widget = &_root_widget;
+        widget = _root_widget;
     }
 
     widget->draw(widget);
@@ -183,9 +196,10 @@ tbui_frame_t *tbui_new_frame(tbui_widget_t* parent)
     frame->widget = tbui_new_widget(parent);
     frame->widget->impl = frame;
     frame->widget->draw = &_draw_frame;
+    frame->widget->dtor = &_frame_dtor;
 
-    frame->title = 0;
-    frame->footnote = 0;
+    frame->title = NULL;
+    frame->footnote = NULL;
     frame->title_align = TBUI_ALIGN_CENTER;
     frame->border_style = TBUI_BORDER_SINGLE;
 
@@ -194,12 +208,13 @@ tbui_frame_t *tbui_new_frame(tbui_widget_t* parent)
 
 void tbui_shutdown()
 {
+    tbui_delete(_root_widget);
     tb_shutdown();
 }
 
-void tbui_append_child(tbui_widget_t *parent, tbui_widget_t *child)
+void tbui_child_append(tbui_widget_t *parent, tbui_widget_t *child)
 {
-    if (!parent) parent = &_root_widget;
+    if (!parent) parent = _root_widget;
 
     if (!parent->children) {
         parent->children_count++;
@@ -216,9 +231,34 @@ void tbui_append_child(tbui_widget_t *parent, tbui_widget_t *child)
     parent->children[parent->children_count - 1] = child;
 }
 
-void tbui_remove_child(tbui_widget_t *parent, tbui_widget_t *child)
+void tbui_child_remove(tbui_widget_t *parent, tbui_widget_t *child)
 {
+    for (int i = 0; i < parent->children_count; ++i) {
+        if (parent->children[i] == child) {
+            size_t child_size = sizeof(tbui_widget_t*);
+            size_t new_size = child_size * ((unsigned long)parent->children_count - 1);
+            tbui_widget_t** new_children = malloc(new_size);
+            if (i > 0)
+                memcpy(new_children, parent->children, child_size * (unsigned long)i);
+            if (i < parent->children_count - 1) {
+                memcpy(
+                    new_children,
+                    parent->children + (child_size * ((unsigned long)i + 1)),
+                    (unsigned long)(parent->children_count - (i + 1))
+                );
+            }
+            free(parent->children);
+            parent->children = new_children;
+            --parent->children_count;
+            break;
+        }
+    }
+}
 
+void tbui_child_delete(tbui_widget_t *parent, tbui_widget_t *child)
+{
+    tbui_child_remove(parent, child);
+    tbui_delete(child);
 }
 
 void tbui_draw_hbitmap_mono(tbui_bound_t* bound, uint8_t *buffer, uint16_t fg_color, uint16_t bg_color, int real_width, int real_height)
@@ -242,8 +282,8 @@ void tbui_draw_hbitmap_mono(tbui_bound_t* bound, uint8_t *buffer, uint16_t fg_co
 
 void tbui_draw_qbitmap_mono(tbui_bound_t* bound, uint8_t *buffer, uint16_t fg_color, uint16_t bg_color, int real_width, int real_height)
 {
-    int offset_col = bound->x + 1;
-    int offset_row = bound->y + 1;
+    int offset_col = bound->x;
+    int offset_row = bound->y;
 
     int real_cols = 64;
 //    int real_rows = 32;
@@ -323,7 +363,7 @@ tbui_bound_t* tbui_real_bound(tbui_widget_t *widget)
 
 tbui_widget_t *tbui_new_widget(tbui_widget_t* parent)
 {
-    if (!parent) parent = &_root_widget;
+    if (!parent) parent = _root_widget;
     tbui_widget_t* widget = malloc(sizeof (tbui_widget_t));
     widget->bound = malloc(sizeof (tbui_bound_t));
     widget->bound->x = 0;
@@ -332,6 +372,7 @@ tbui_widget_t *tbui_new_widget(tbui_widget_t* parent)
     widget->bound->h = 2;
     widget->visible = false;
     widget->impl = 0;
+    widget->dtor = &_widget_dtor_dummy;
     widget->draw = &_draw_widget_dummy;
     widget->custom_draw = 0;
     widget->parent = parent;
@@ -421,4 +462,71 @@ tbui_monobitmap_t *tbui_new_monobitmap(tbui_widget_t *parent)
     bitmap->bitmap_style = TBUI_BITMAP_HALF_BLOCK;
 
     return bitmap;
+}
+
+int tbui_delete(tbui_widget_t *widget)
+{
+    for (int i = 0; i < widget->children_count; ++i) {
+        tbui_delete(widget->children[i]);
+    }
+    if (widget->parent)
+        tbui_child_remove(widget->parent, widget);
+    widget->dtor(widget);
+    free(widget->bound);
+    free(widget);
+    return 0;
+}
+
+static bool _filedialog_dummy_filter(const char* filename) {
+    (void)filename;
+    return true;
+}
+
+int tbui_exdiaglog_openfile(char *out_filename,
+                             const char *frame_title,
+                             const char *frame_footnote,
+                             const char *start_dir,
+                             bool (*filter_func)(const char *))
+{
+    int diag_w = 30;
+    int diag_h = 20;
+    bool finish = false;
+    if (!filter_func) filter_func = &_filedialog_dummy_filter;
+    /* setup */
+    tbui_frame_t *frame = tbui_new_frame(NULL);
+    tbui_set_bound(frame->widget,
+                   tb_width()/2 - diag_w/2,
+                   tb_height()/2 - diag_h/2,
+                   diag_w, diag_h);
+    frame->title = frame_title;
+    frame->footnote = frame_footnote;
+    frame->title_align = TBUI_ALIGN_CENTER;
+    struct dirent **namelist;
+    int count = scandir(start_dir, &namelist, NULL, alphasort);
+
+    tbui_redraw(NULL);
+
+    /* event loop */
+    struct tb_event ev;
+    while (!finish) {
+        tb_poll_event(&ev);
+        if (ev.type != TB_EVENT_KEY)
+            continue;
+        switch (ev.key) {
+        case TB_KEY_TAB:
+            break;
+        case TB_KEY_ENTER:
+            break;
+        case TB_KEY_ARROW_UP:
+            break;
+        case TB_KEY_ARROW_DOWN:
+            break;
+        case TB_KEY_ESC:
+            finish = true;
+            break;
+        }
+    }
+
+    tbui_delete(frame->widget);
+    return finish;
 }

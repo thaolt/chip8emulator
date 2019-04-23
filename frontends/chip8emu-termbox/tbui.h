@@ -40,12 +40,14 @@ struct tbui_bound_t {
 struct tbui_widget_t {
     tbui_bound_t* bound;
     bool visible;
-    void* impl;
     void (*draw)(tbui_widget_t *);
     void (*custom_draw)(tbui_widget_t *);
     tbui_widget_t** children;
     tbui_widget_t* parent;
     int children_count;
+    /* for subclasses */
+    void (*dtor)(tbui_widget_t *);
+    void* impl;
 };
 
 struct tbui_frame_t {
@@ -97,9 +99,18 @@ tbui_frame_t* tbui_new_frame(tbui_widget_t* parent);
 tbui_label_t* tbui_new_label(tbui_widget_t* parent);
 tbui_monobitmap_t* tbui_new_monobitmap(tbui_widget_t* parent);
 
-void tbui_append_child(tbui_widget_t *parent, tbui_widget_t *child);
-void tbui_remove_child(tbui_widget_t *parent, tbui_widget_t *child);
+int tbui_exdiaglog_openfile(
+    char *out_filename,
+    const char* frame_title,
+    const char* frame_footnote,
+    const char* start_dir,
+    bool (*filter_func)(const char*)
+);
 
+void tbui_child_append(tbui_widget_t *parent, tbui_widget_t *child);
+void tbui_child_remove(tbui_widget_t *parent, tbui_widget_t *child);
+
+int tbui_delete(tbui_widget_t* widget);
 int tbui_init(void);
 void tbui_shutdown(void);
 void tbui_redraw(tbui_widget_t* widget);
