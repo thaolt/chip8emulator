@@ -2,11 +2,14 @@ language: c
 sudo: false
 git:
   depth: 3
-dist: trusty
+dist: xenial
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
+      - g++-7
       - libsdl2-dev
 script:
   - mkdir build && cd build
-  - cmake .. && cmake --build .
+  - CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 cmake .. && cmake --build .
