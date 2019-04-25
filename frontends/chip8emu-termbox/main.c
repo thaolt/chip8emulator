@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <libgen.h> /* for basename() */
 
 #include "log.h"
 #include "termbox.h"
@@ -11,7 +12,7 @@
 
 #include "chip8emu.h"
 
-#define DISP_FG TB_CYAN
+#define DISP_FG TB_GREEN
 #define DISP_BG TB_BLACK
 #define CONTAINER_WIDTH 92
 #define CONTAINER_MIN_HEIGHT 25
@@ -24,7 +25,44 @@ static chip8emu_snapshot snapshot;
 static tbui_widget_t * container;
 static tbui_frame_t *cpu_pane;
 static tbui_frame_t *disp_pane;
+static tbui_frame_t *keymap_pane;
 static chip8emu *emu;
+static char * basedir;
+
+static char *default_keymap[0x10] = {
+    "1", "2", "3", "4",
+    "q", "w", "e", "r",
+    "a", "s", "d", "f",
+    "z", "x", "c", "v"
+};
+
+//static char *game_keymap[0x10] = {
+//    0,      0,      0,          0,
+//    "up",   "left", "right",    "down",
+//    0,      0,      0,          0,
+//    0,      0,      0,          0
+//};
+
+static char *game_keymap[0x10] = {
+    0,      0,      0,          0,
+    "w",     "a",   "d",        "s",
+    0,      0,      0,          0,
+    0,      0,      0,          0
+};
+
+static uint32_t game_tb_keymap[0x10] = {
+    0,      0,      0,          0,
+    TB_KEY_ARROW_UP, TB_KEY_ARROW_LEFT, TB_KEY_ARROW_RIGHT, TB_KEY_ARROW_DOWN,
+    0 ,     0,      0,          0,
+    0,      0,      0,          0
+};
+
+static uint32_t keymap_dispay[0x10] = {
+    0,      0,      0,          0,
+    'w',    'a',    'd',        's',
+    0 ,     0,      0,          0,
+    0,      0,      0,          0
+};
 
 void cpu_pane_draw_content(tbui_widget_t *widget) {
     for (int i = 0; i < 16; ++i) {
@@ -42,8 +80,45 @@ void cpu_pane_draw_content(tbui_widget_t *widget) {
     tbui_printf(widget, 2, 8, 0, 0, "SP #%02X", snapshot.sp);
 }
 
-void draw_keyboard() {
+void draw_keyboard(tbui_widget_t *widget) {
+    /* tbui_change_cell(widget, 0, 0, 0x251C, 0 ,0);
+    tbui_change_cell(widget, widget->bound->w - 1, 0, 0x252C, 0 ,0);
+    */
+    uint16_t fg, bg;
+    for (int i = 1; i <= 9; ++i) {
+        int x = ((i-1) % 3) * 3 + 1;
+        int y = 1 + ((i-1) / 3);
+        fg = i % 2 ? TB_WHITE : TB_BLACK;
+        bg = i % 2 ? TB_BLACK : TB_WHITE;
+        tbui_print(widget, "   ", x, y, fg, bg);
+        tbui_change_cell(widget, x + 1, y, keymap_dispay[i], fg, bg);
+    }
 
+    fg = TB_BLACK; bg = TB_WHITE;
+
+    tbui_print(widget, "   ", 10, 1, fg, bg);
+    tbui_change_cell(widget, 11, 1, keymap_dispay[0xC], fg, bg);
+
+    tbui_print(widget, "   ", 10, 3, fg, bg);
+    tbui_change_cell(widget, 11, 3, keymap_dispay[0xE], fg, bg);
+
+    tbui_print(widget, "   ", 1, 4, fg, bg);
+    tbui_change_cell(widget, 2, 4, keymap_dispay[0xA], fg, bg);
+
+    tbui_print(widget, "   ", 7, 4, fg, bg);
+    tbui_change_cell(widget, 8, 4, keymap_dispay[0xB], fg, bg);
+
+
+    fg = TB_WHITE; bg = TB_BLACK;
+
+    tbui_print(widget, "   ", 10, 2, fg, bg);
+    tbui_change_cell(widget, 11, 2, keymap_dispay[0xD], fg, bg);
+
+    tbui_print(widget, "   ", 10, 4, fg, bg);
+    tbui_change_cell(widget, 11, 4, keymap_dispay[0xF], fg, bg);
+
+    tbui_print(widget, "   ", 4, 4, fg, bg);
+    tbui_change_cell(widget, 5, 4, keymap_dispay[0x0], fg, bg);
 }
 
 void draw_toolbar(tbui_widget_t *widget) {
@@ -56,31 +131,39 @@ void draw_toolbar(tbui_widget_t *widget) {
 
     tbui_print(widget, " ^X", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Exit", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    col += 9;
 
     tbui_print(widget, " ^O", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Load ROM", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    col += 13;
 
     tbui_print(widget, "SPC", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Pause", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    col += 10;
 
     tbui_print(widget, " ^R", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Reset", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    col += 10;
 
     tbui_print(widget, " ^[", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "CLK down", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    tbui_print(widget, "ClkDn", col + 4, line2y, 0, 0);
+    col += 10;
 
     tbui_print(widget, " ^]", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "CLK Up", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    tbui_print(widget, "ClkUp", col + 4, line2y, 0, 0);
+    col += 10;
+
+    tbui_print(widget, " ^M", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "QSave", col + 4, line2y, 0, 0);
+    col += 10;
+
+    tbui_print(widget, " ^L", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "QLoad", col + 4, line2y, 0, 0);
+    col += 10;
 
     tbui_print(widget, " ^H", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Help", col + 4, line2y, 0, 0);
-    col = ++col_idx * col_w;
+    col += 9;
 
     free(bound);
 }
@@ -162,6 +245,14 @@ static void setup_ui() {
         }
     }
 
+    keymap_pane = tbui_new_frame(container);
+    keymap_pane->title = "[ Keymap ]";
+    keymap_pane->title_align = TBUI_ALIGN_LEFT;
+    tbui_set_bound(keymap_pane->widget, 0, 18, 14, 6);
+    tbui_set_visible(keymap_pane->widget, true);
+    tbui_child_append(container, keymap_pane->widget);
+    keymap_pane->widget->custom_draw = &draw_keyboard;
+
     tbui_redraw(NULL);
 }
 
@@ -181,7 +272,8 @@ int display_draw_thread(void *arg) {
         mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
         chip8emu_take_snapshot(emu, &snapshot);
-        tbui_redraw(NULL);
+        tbui_redraw(disp_pane->widget);
+        tbui_redraw(cpu_pane->widget);
         tb_present();
         frame_count++;
         elapsed_time = (uint32_t)time(NULL) - start_time;
@@ -203,8 +295,26 @@ int keypad_thread(void *arg) {
         tb_poll_event(&ev);
         if (ev.type == TB_EVENT_KEY)
             switch (ev.key) {
-            case TB_KEY_CTRL_O:
+            case TB_KEY_CTRL_O: {
+                bool was_paused = emu->paused;
+                if (!was_paused)
+                    chip8emu_pause(emu);
+                char filepath[1024] = {0};
+                int ok = tbui_exdiaglog_openfile(
+                    filepath,
+                    "[ Open ROM ]",
+                    "<ESC>Cancel-<ENTER>Select-<TAB>Switch",
+                    basedir, 0
+                );
+                if (ok) {
+
+                } else {
+                    if (!was_paused)
+                        chip8emu_resume(emu);
+                }
+                tbui_redraw(NULL);
                 break;
+            }
             case TB_KEY_CTRL_X:
                 quit = true;
                 break;
@@ -231,67 +341,27 @@ int keypad_thread(void *arg) {
                     tbui_redraw(NULL);
                 }
                 break;
-            case TB_KEY_ARROW_UP:
-                keybuffer[0x4]++;
+            case TB_KEY_CTRL_M:
                 break;
-            case TB_KEY_ARROW_DOWN:
-                keybuffer[0x7]++;
+            case TB_KEY_CTRL_L:
                 break;
-            case TB_KEY_ARROW_LEFT:
-                keybuffer[0x5]++;
-                break;
-            case TB_KEY_ARROW_RIGHT:
-                keybuffer[0x6]++;
-                break;
-            default:
-                switch (ev.ch) {
-                case '0':
-                    keybuffer[0x0]++;
-                    break;
-                case '1':
-                    keybuffer[0x1]++;
-                    break;
-                case '2':
-                    keybuffer[0x2]++;
-                    break;
-                case '3':
-                    keybuffer[0x3]++;
-                    break;
-                case '4':
-                    keybuffer[0x4]++;
-                    break;
-                case '5':
-                    keybuffer[0x5]++;
-                    break;
-                case '6':
-                    keybuffer[0x6]++;
-                    break;
-                case '7':
-                    keybuffer[0x7]++;
-                    break;
-                case '8':
-                    keybuffer[0x8]++;
-                    break;
-                case '9':
-                    keybuffer[0x9]++;
-                    break;
-                case '+':
-                    keybuffer[0xB]++;
-                    break;
-                case '-':
-                    keybuffer[0xC]++;
-                    break;
-                case '*':
-                    keybuffer[0xD]++;
-                    break;
-                case '/':
-                    keybuffer[0xE]++;
-                    break;
-                case '.':
-                    keybuffer[0xF]++;
-                    break;
+            default: {
+                for (int i = 0; i < 0x10; ++i) {
+                    if (game_keymap[i]) {
+                        if (strlen(game_keymap[i])>1) {
+                            if (ev.key == game_tb_keymap[i]) {
+                                keybuffer[i]++;
+                                break;
+                            }
+                        } else {
+                            if ((uint8_t)ev.ch == game_keymap[i][0]) {
+                                keybuffer[i]++;
+                                break;
+                            }
+                        }
+                    }
                 }
-                break;
+            }
             }
 
         if (ev.type == TB_EVENT_RESIZE) {
@@ -311,7 +381,8 @@ int keypad_thread(void *arg) {
 }
 
 int main(int argc, char **argv) {
-    (void)argc; (void)argv; /* unused variables */
+    (void)argc;
+    basedir = dirname(argv[0]);
 
     int ret = tbui_init();
     if (ret) {
@@ -321,7 +392,7 @@ int main(int argc, char **argv) {
 
     /*
     if (tb_width() < CONTAINER_WIDTH || tb_height() < CONTAINER_MIN_HEIGHT) {
-        log_error("terminal geometry (width x height) has to be at least 92x25 column.");
+        log_error("terminal geometry (width x height) has to be at least 92x25.");
         goto quit;
     }
     */

@@ -483,16 +483,29 @@ static bool _filedialog_dummy_filter(const char* filename) {
     return true;
 }
 
+void tbui_fill_rect(tbui_widget_t* widget, int x, int y, int w, int h, uint32_t ch, uint16_t fg, uint16_t bg) {
+    tbui_bound_t* real_bound = tbui_real_bound(widget);
+    for (int j = 0; j < h; ++j) {
+        for (int i = 0; i < w; ++i) {
+            tb_change_cell(real_bound->x + i + x, real_bound->y + j + y, ch, fg, bg);
+        }
+    }
+    free(real_bound);
+}
+
 int tbui_exdiaglog_openfile(char *out_filename,
                              const char *frame_title,
                              const char *frame_footnote,
-                             const char *start_dir,
+                             char *start_dir,
                              bool (*filter_func)(const char *))
 {
-    int diag_w = 30;
-    int diag_h = 20;
+    int diag_w = 56;
+    int diag_h = 22;
+    int retcode = false;
     bool finish = false;
+    char * curdir = strdup(start_dir);
     if (!filter_func) filter_func = &_filedialog_dummy_filter;
+
     /* setup */
     tbui_frame_t *frame = tbui_new_frame(NULL);
     tbui_set_bound(frame->widget,
@@ -502,10 +515,15 @@ int tbui_exdiaglog_openfile(char *out_filename,
     frame->title = frame_title;
     frame->footnote = frame_footnote;
     frame->title_align = TBUI_ALIGN_CENTER;
-    struct dirent **namelist;
-    int count = scandir(start_dir, &namelist, NULL, alphasort);
+    frame->border_style = TBUI_BORDER_THIN_SHADOW;
+    tbui_set_visible(frame->widget, true);
+    tbui_child_append(_root_widget, frame->widget);
 
+    struct dirent **namelist;
+    int entries_count = scandir(curdir, &namelist, NULL, alphasort);
     tbui_redraw(NULL);
+    tbui_fill_rect(frame->widget, 1, 1, diag_w - 2, diag_h - 2, ' ', 0, 0);
+    tb_present();
 
     /* event loop */
     struct tb_event ev;
@@ -528,6 +546,7 @@ int tbui_exdiaglog_openfile(char *out_filename,
         }
     }
 
-    tbui_delete(frame->widget);
-    return finish;
+    tbui_child_delete(_root_widget, frame->widget);
+    tb_clear();
+    return retcode;
 }
