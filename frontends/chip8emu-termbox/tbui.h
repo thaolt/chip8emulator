@@ -93,7 +93,7 @@ void tbui_set_bound(tbui_widget_t *widget, int x, int y, int w, int h);
 void tbui_show(tbui_widget_t* widget);
 void tbui_hide(tbui_widget_t* widget);
 void tbui_set_visible(tbui_widget_t* widget, bool visible);
-void tbui_set_draw_func(tbui_widget_t* widget, void (*func)(tbui_widget_t *));
+void tbui_set_user_draw_func(tbui_widget_t* widget, void (*func)(tbui_widget_t *));
 
 tbui_frame_t* tbui_new_frame(tbui_widget_t* parent);
 tbui_label_t* tbui_new_label(tbui_widget_t* parent);

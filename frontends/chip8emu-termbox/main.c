@@ -46,6 +46,49 @@ void draw_keyboard() {
 
 }
 
+void draw_toolbar(tbui_widget_t *widget) {
+    tbui_bound_t* bound = tbui_real_bound(widget);
+    /* int line1y = bound->h - 2;*/
+    int line2y = bound->h - 1;
+    int col_w = 14;
+    int col_idx = 0;
+    int col = col_idx * col_w;
+
+    tbui_print(widget, " ^X", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Exit", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    tbui_print(widget, " ^O", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Load ROM", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    tbui_print(widget, "SPC", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Pause", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    tbui_print(widget, " ^R", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Reset", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    tbui_print(widget, " ^[", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "CLK down", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    tbui_print(widget, " ^]", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "CLK Up", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    tbui_print(widget, " ^H", col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Help", col + 4, line2y, 0, 0);
+    col = ++col_idx * col_w;
+
+    free(bound);
+}
+
+void relayout() {
+
+}
+
 
 void beep_callback() {
 
@@ -77,6 +120,7 @@ static void setup_ui() {
         0, CONTAINER_WIDTH, tb_height());
     tbui_set_visible(container, true);
     tbui_child_append(NULL, container);
+    tbui_set_user_draw_func(container, &draw_toolbar);
 
     cpu_pane = tbui_new_frame(container);
     cpu_pane->title = "[ CPU ]";
@@ -165,6 +209,9 @@ int keypad_thread(void *arg) {
                 quit = true;
                 break;
             case TB_KEY_CTRL_R:
+                if (emu->paused) {
+                    disp_pane->widget->children[1]->visible = false;
+                }
                 chip8emu_reset(emu);
                 break;
             case TB_KEY_CTRL_RSQ_BRACKET:

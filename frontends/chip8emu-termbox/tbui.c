@@ -169,7 +169,6 @@ static void _draw_frame(tbui_widget_t* widget) {
         }
     }
 
-    if (widget->custom_draw) widget->custom_draw(widget);
     free(bound);
 }
 
@@ -180,6 +179,8 @@ void tbui_redraw(tbui_widget_t* widget)
     }
 
     widget->draw(widget);
+    if (widget->custom_draw)
+        widget->custom_draw(widget);
 
     for (int i = 0; i < widget->children_count; ++i) {
         tbui_widget_t *child = widget->children[i];
@@ -425,9 +426,9 @@ void tbui_hide(tbui_widget_t *widget)
     tbui_set_visible(widget, false);
 }
 
-void tbui_set_draw_func(tbui_widget_t *widget, void (*func)(tbui_widget_t *))
+void tbui_set_user_draw_func(tbui_widget_t *widget, void (*func)(tbui_widget_t *))
 {
-    widget->draw = func;
+    widget->custom_draw = func;
 }
 
 static void _draw_monobitmap(tbui_widget_t* widget) {
