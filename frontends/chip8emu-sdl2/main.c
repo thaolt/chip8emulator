@@ -34,11 +34,12 @@ static mtx_t draw_mtx;
 static cnd_t draw_cnd;
 
 static bool keystates[16] = {0};
+static chip8emu_snapshot snapshot;
 
 void draw_callback(chip8emu *cpu) {
     (void)cpu;
     mtx_lock(&draw_mtx);
-    cnd_signal(&draw_cnd);
+    cnd_broadcast(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
 
@@ -55,7 +56,6 @@ void beep_callback(chip8emu * cpu) {
 }
 
 int keypad_thread(void *arg) {
-//    chip8emu * cpu = (chip8emu*) arg;
     (void)arg;
 
     SDL_Event e;
@@ -98,8 +98,6 @@ int keypad_thread(void *arg) {
 }
 
 
-
-
 int display_draw_thread(void *arg) {
     chip8emu * cpu = (chip8emu*) arg;
 
@@ -140,16 +138,17 @@ int display_draw_thread(void *arg) {
             64, 32);
 
     // Emulation loop
+    void* pixels;
+    int pitch;
+    mtx_lock(&draw_mtx);
     while (true) {
-        void* pixels;
-        int pitch;
-        mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
+        chip8emu_take_snapshot(cpu, &snapshot);
 
         // Update SDL texture
         SDL_LockTexture(sdlTexture, NULL, &pixels, &pitch);
         for (int i = 0; i < 2048; ++i) {
-            ((Uint32 *) pixels)[i] = cpu->gfx[i] * 0x00FFFFFF | 0xFF000000;
+            ((Uint32 *) pixels)[i] = snapshot.gfx[i] * 0x00FFFFFF | 0xFF000000;
         }
         SDL_UnlockTexture(sdlTexture);
         // Clear screen and render
@@ -157,8 +156,8 @@ int display_draw_thread(void *arg) {
         SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
         SDL_RenderPresent(renderer);
 
-        mtx_unlock(&draw_mtx);
     }
+    mtx_unlock(&draw_mtx);
 
 }
 
@@ -189,7 +188,7 @@ int main(int argc, char **argv) {
     }
 
     chip8emu_load_rom(cpu, "E:\\Workspaces\\roms\\TETRIS");
-    chip8emu_set_cpu_speed(cpu, 1000);
+    chip8emu_set_cpu_speed(cpu, 1200);
     chip8emu_start(cpu);
 
     thrd_join(thrd_keypad, NULL);

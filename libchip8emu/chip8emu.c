@@ -656,12 +656,12 @@ void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot *snapshot)
     snapshot->pc = emu->pc;
 #ifndef CHIP8EMU_NO_THREAD
     mtx_unlock(emu->mtx_cpu);
-//    mtx_lock(emu->mtx_timers);
+    mtx_lock(emu->mtx_timers);
 #endif /* CHIP8EMU_NO_THREAD */
     snapshot->delay_timer = emu->delay_timer;
     snapshot->sound_timer = emu->sound_timer;
 #ifndef CHIP8EMU_NO_THREAD
-//    mtx_unlock(emu->mtx_timers);
+    mtx_unlock(emu->mtx_timers);
 #endif /* CHIP8EMU_NO_THREAD */
 }
 
