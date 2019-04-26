@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <memory.h>
+#include <time.h>
 #include "chip8emu.h"
 
 #ifndef CHIP8EMU_NO_THREAD
