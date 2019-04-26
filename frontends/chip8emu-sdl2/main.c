@@ -35,11 +35,13 @@ static cnd_t draw_cnd;
 
 static bool keystates[16] = {0};
 static chip8emu_snapshot snapshot;
+static bool draw_flag = false;
 
 void draw_callback(chip8emu *cpu) {
     (void)cpu;
     mtx_lock(&draw_mtx);
     cnd_broadcast(&draw_cnd);
+    draw_flag = true;
     mtx_unlock(&draw_mtx);
 }
 
@@ -58,42 +60,7 @@ void beep_callback(chip8emu * cpu) {
 int keypad_thread(void *arg) {
     (void)arg;
 
-    SDL_Event e;
-    bool quit = false;
-    struct timespec delay = {
-        .tv_sec = 0,
-        .tv_nsec = 1000000
-    };
-    while (!quit) {
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) quit = true;
 
-            if (e.type == SDL_KEYDOWN) {
-                mtx_lock(&key_mtx);
-                for (int i = 0; i < 16; ++i) {
-                    if (e.key.keysym.sym == keymap[i]) {
-                        keystates[i] = true;
-                    }
-                }
-                mtx_unlock(&key_mtx);
-            }
-
-            if (e.type == SDL_KEYUP) {
-                if (e.key.keysym.sym == SDLK_ESCAPE)
-                    quit = true;
-                else {
-                    mtx_lock(&key_mtx);
-                    for (int i = 0; i < 16; ++i) {
-                        if (e.key.keysym.sym == keymap[i]) {
-                            keystates[i] = false;
-                        }
-                    }
-                    mtx_unlock(&key_mtx);
-                }
-            }
-        }
-        thrd_sleep(&delay, 0);
-    }
     return 0;
 }
 
@@ -137,27 +104,70 @@ int display_draw_thread(void *arg) {
             SDL_TEXTUREACCESS_STREAMING,
             64, 32);
 
-    // Emulation loop
-    void* pixels;
-    int pitch;
-    mtx_lock(&draw_mtx);
-    while (true) {
-        cnd_wait(&draw_cnd, &draw_mtx);
-        chip8emu_take_snapshot(cpu, &snapshot);
+    SDL_Event e;
+    bool quit = false;
+    struct timespec delay = {
+        .tv_sec = 0,
+        .tv_nsec = 1000000
+    };
+    while (!quit) {
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) quit = true;
 
-        // Update SDL texture
-        SDL_LockTexture(sdlTexture, NULL, &pixels, &pitch);
-        for (int i = 0; i < 2048; ++i) {
-            ((Uint32 *) pixels)[i] = snapshot.gfx[i] * 0x00FFFFFF | 0xFF000000;
+            if (e.type == SDL_KEYDOWN) {
+                mtx_lock(&key_mtx);
+                for (int i = 0; i < 16; ++i) {
+                    if (e.key.keysym.sym == keymap[i]) {
+                        keystates[i] = true;
+                    }
+                }
+                mtx_unlock(&key_mtx);
+            }
+
+            if (e.type == SDL_KEYUP) {
+                if (e.key.keysym.sym == SDLK_ESCAPE)
+                    quit = true;
+                else {
+                    mtx_lock(&key_mtx);
+                    for (int i = 0; i < 16; ++i) {
+                        if (e.key.keysym.sym == keymap[i]) {
+                            keystates[i] = false;
+                        }
+                    }
+                    mtx_unlock(&key_mtx);
+                }
+            }
         }
-        SDL_UnlockTexture(sdlTexture);
-        // Clear screen and render
-        SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
-        SDL_RenderPresent(renderer);
+        mtx_lock(&draw_mtx);
+        if (draw_flag) {
+            int pitch;
+            void* pixels;
+            chip8emu_take_snapshot(cpu, &snapshot);
 
+            // Update SDL texture
+            SDL_LockTexture(sdlTexture, NULL, &pixels, &pitch);
+            for (int i = 0; i < 2048; ++i) {
+                ((Uint32 *) pixels)[i] = snapshot.gfx[i] * 0x00FFFFFF | 0xFF000000;
+            }
+            SDL_UnlockTexture(sdlTexture);
+            // Clear screen and render
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
+            SDL_RenderPresent(renderer);
+            draw_flag = false;
+        }
+        mtx_unlock(&draw_mtx);
+//        thrd_sleep(&delay, 0);
     }
-    mtx_unlock(&draw_mtx);
+
+    // Emulation loop
+//    while (true) {
+//        mtx_lock(&draw_mtx);
+//        cnd_wait(&draw_cnd, &draw_mtx);
+
+
+//        mtx_unlock(&draw_mtx);
+//    }
 
 }
 
@@ -175,12 +185,12 @@ int main(int argc, char **argv) {
     cpu->beep = &beep_callback;
 
     thrd_t thrd_draw;
-    thrd_t thrd_keypad;
+//    thrd_t thrd_keypad;
 
-    if (thrd_create(&thrd_keypad, keypad_thread, (void*)cpu) != thrd_success) {
-        log_error("Cannot create keypad thread!");
-        goto quit;
-    }
+//    if (thrd_create(&thrd_keypad, keypad_thread, (void*)cpu) != thrd_success) {
+//        log_error("Cannot create keypad thread!");
+//        goto quit;
+//    }
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)cpu) != thrd_success) {
         log_error("Cannot create draw thread!");
@@ -191,7 +201,7 @@ int main(int argc, char **argv) {
     chip8emu_set_cpu_speed(cpu, 1200);
     chip8emu_start(cpu);
 
-    thrd_join(thrd_keypad, NULL);
+    thrd_join(thrd_draw, NULL);
 
 quit:
     return 0;
