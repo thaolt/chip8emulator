@@ -29,6 +29,9 @@ cd dist/
 
 [**How to write your own chip 8 emulator**](libchip8emu#how-to-write-your-own-emulator)
 
+## Related projects
+
+* (Chip8EMU Handheld)[https://github.com/thaolt/chip8emu-handheld]
 
 ## Screencasts
 
