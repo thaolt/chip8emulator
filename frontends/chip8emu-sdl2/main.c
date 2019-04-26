@@ -1,5 +1,9 @@
 #include "stdint.h"
+#ifdef WIN32
+#include "SDL.h"
+#else
 #include "SDL2/SDL.h"
+#endif
 
 #include "log.h"
 #include "tinycthread.h"
@@ -162,6 +166,10 @@ int display_draw_thread(void *arg) {
 int main(int argc, char **argv) {
     (void) argc; (void) argv;
 
+    mtx_init(&draw_mtx, mtx_plain);
+    mtx_init(&key_mtx, mtx_plain);
+    cnd_init(&draw_cnd);
+
     chip8emu* cpu= chip8emu_new();
     cpu->draw = &draw_callback;
     cpu->keystate = &keystate_callback;
@@ -180,8 +188,8 @@ int main(int argc, char **argv) {
         goto quit;
     }
 
-    chip8emu_load_rom(cpu, "/home/thaolt/Workspaces/roms/TETRIS");
-    chip8emu_set_cpu_speed(cpu,1000);
+    chip8emu_load_rom(cpu, "E:\\Workspaces\\roms\\TETRIS");
+    chip8emu_set_cpu_speed(cpu, 1000);
     chip8emu_start(cpu);
 
     thrd_join(thrd_keypad, NULL);

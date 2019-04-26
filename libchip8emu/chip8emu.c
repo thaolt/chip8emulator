@@ -142,13 +142,20 @@ chip8emu *chip8emu_new(void)
     emu->thrd_cpu_cycle = malloc(sizeof (thrd_t));
 
     emu->mtx_cpu = malloc(sizeof (mtx_t));
+    mtx_init(emu->mtx_cpu, mtx_plain);
     emu->mtx_timers = malloc(sizeof (mtx_t));
+    mtx_init(emu->mtx_timers, mtx_plain);
     emu->mtx_pause = malloc(sizeof (mtx_t));
+    mtx_init(emu->mtx_pause, mtx_plain);
 
     emu->cnd_clk_cpu = malloc(sizeof (cnd_t));
+    cnd_init(emu->cnd_clk_cpu);
     emu->cnd_clk_timers = malloc(sizeof (cnd_t));
+    cnd_init(emu->cnd_clk_timers);
     emu->cnd_resume_cpu = malloc(sizeof (cnd_t));
+    cnd_init(emu->cnd_resume_cpu);
     emu->cnd_resume_timers = malloc(sizeof (cnd_t));
+    cnd_init(emu->cnd_resume_timers);
 #endif /* CHIP8EMU_NO_THREAD */
 
     return emu;
