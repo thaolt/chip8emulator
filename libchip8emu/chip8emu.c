@@ -20,12 +20,12 @@ enum { C8E_LOG_DEBUG, C8E_LOG_INFO, C8E_LOG_WARN, C8E_LOG_ERR, C8E_LOG_FATAL };
 
 static void _chip8emu_log_forward(chip8emu* emu, int level, const char *file, int line, const char *fmt, ...)
 {
-    char* message = calloc(1000, sizeof (char));
+    char message[255] = {0};
 
     va_list args;
 
     va_start(args, fmt);
-    snprintf(message, 1000, fmt, args);
+    vsnprintf(message, 255, fmt, args);
     va_end(args);
 
     emu->log(emu, level, file, line, message);
@@ -88,7 +88,7 @@ chip8emu *chip8emu_new(void)
     emu->sp     = 0;      /* Reset stack pointer */
 
     memset(&(emu->gfx), 0, 64 * 32);      /* Clear display */
-    memset(&(emu->stack), 0, 16);         /* Clear stack */
+    memset(&(emu->stack), 0, 16 * sizeof(uint16_t));         /* Clear stack */
     memset(&(emu->V), 0, 16);             /* Clear registers V0-VF */
     memset(&(emu->memory), 0, 4096);      /* Clear memory */
 
@@ -142,20 +142,20 @@ chip8emu *chip8emu_new(void)
     emu->thrd_cpu_cycle = malloc(sizeof (thrd_t));
 
     emu->mtx_cpu = malloc(sizeof (mtx_t));
-    mtx_init(emu->mtx_cpu, mtx_plain);
+    //mtx_init(emu->mtx_cpu, mtx_plain);
     emu->mtx_timers = malloc(sizeof (mtx_t));
-    mtx_init(emu->mtx_timers, mtx_plain);
+    //mtx_init(emu->mtx_timers, mtx_plain);
     emu->mtx_pause = malloc(sizeof (mtx_t));
-    mtx_init(emu->mtx_pause, mtx_plain);
+    //mtx_init(emu->mtx_pause, mtx_plain);
 
     emu->cnd_clk_cpu = malloc(sizeof (cnd_t));
-    cnd_init(emu->cnd_clk_cpu);
+    //cnd_init(emu->cnd_clk_cpu);
     emu->cnd_clk_timers = malloc(sizeof (cnd_t));
-    cnd_init(emu->cnd_clk_timers);
+    //cnd_init(emu->cnd_clk_timers);
     emu->cnd_resume_cpu = malloc(sizeof (cnd_t));
-    cnd_init(emu->cnd_resume_cpu);
+    //cnd_init(emu->cnd_resume_cpu);
     emu->cnd_resume_timers = malloc(sizeof (cnd_t));
-    cnd_init(emu->cnd_resume_timers);
+    //cnd_init(emu->cnd_resume_timers);
 #endif /* CHIP8EMU_NO_THREAD */
 
     return emu;
@@ -499,6 +499,7 @@ static int chip8emu_thread_clk_timers(void *arg) {
 
         thrd_sleep(emu->_timer_clk_delay, 0);
     }
+    return C8ERR_OK;
 }
 
 static int chip8emu_thread_clk_cpu(void *arg) {
@@ -517,6 +518,7 @@ static int chip8emu_thread_clk_cpu(void *arg) {
 
         thrd_sleep(emu->_cpu_clk_delay, 0);
     }
+    return C8ERR_OK;
 }
 
 static int chip8emu_thread_timer_tick(void *arg) {
@@ -527,6 +529,7 @@ static int chip8emu_thread_timer_tick(void *arg) {
         chip8emu_timer_tick(emu);
         mtx_unlock(emu->mtx_timers);
     }
+    return C8ERR_OK;
 }
 
 
@@ -538,6 +541,7 @@ static int chip8emu_thread_cpu_cycle(void* arg) {
         chip8emu_exec_cycle(emu);
         mtx_unlock(emu->mtx_cpu);
     }
+    return C8ERR_OK;
 }
 
 
@@ -591,7 +595,7 @@ void chip8emu_reset(chip8emu *emu)
     emu->sp     = 0;      /* Reset stack pointer */
 
     memset(&(emu->gfx), 0, 64 * 32);      /* Clear display */
-    memset(&(emu->stack), 0, 16);         /* Clear stack */
+    memset(&(emu->stack), 0, 16 * sizeof(uint16_t));         /* Clear stack */
     memset(&(emu->V), 0, 16);             /* Clear registers V0-VF */
 
     emu->delay_timer = 0;
