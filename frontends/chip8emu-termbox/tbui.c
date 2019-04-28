@@ -69,7 +69,7 @@ int tbui_init()
     _root_widget->children_count = 0;
     _root_widget->draw = &_draw_widget_dummy;
     _root_widget->dtor = &_widget_dtor_dummy;
-    _root_widget->custom_draw = 0;
+    _root_widget->custom_draw = NULL;
     _root_widget->bound = malloc(sizeof (tbui_bound_t));
     _root_widget->bound->x = 0;
     _root_widget->bound->y = 0;
@@ -236,20 +236,23 @@ void tbui_child_remove(tbui_widget_t *parent, tbui_widget_t *child)
 {
     for (int i = 0; i < parent->children_count; ++i) {
         if (parent->children[i] == child) {
+            tbui_widget_t** old_children = parent->children;
             size_t child_size = sizeof(tbui_widget_t*);
             size_t new_size = child_size * ((unsigned long)parent->children_count - 1);
-            tbui_widget_t** new_children = malloc(new_size);
-            if (i > 0)
-                memcpy(new_children, parent->children, child_size * (unsigned long)i);
-            if (i < parent->children_count - 1) {
-                memcpy(
-                    new_children,
-                    parent->children + (child_size * ((unsigned long)i + 1)),
-                    (unsigned long)(parent->children_count - (i + 1))
-                );
+            if (new_size) {
+                tbui_widget_t** new_children = malloc(new_size);
+                if (i > 0)
+                    memcpy(new_children, parent->children[0], child_size * (unsigned long)i);
+                if (i < parent->children_count - 1) {
+                    memcpy(
+                        new_children + ((unsigned long)i*child_size),
+                        parent->children[i+1],
+                        (unsigned long)(parent->children_count - (i + 1)) * child_size
+                    );
+                }
+                parent->children = new_children;
             }
-            free(parent->children);
-            parent->children = new_children;
+            free(old_children);
             --parent->children_count;
             break;
         }
@@ -470,8 +473,7 @@ int tbui_delete(tbui_widget_t *widget)
     for (int i = 0; i < widget->children_count; ++i) {
         tbui_delete(widget->children[i]);
     }
-    if (widget->parent)
-        tbui_child_remove(widget->parent, widget);
+
     widget->dtor(widget);
     free(widget->bound);
     free(widget);
