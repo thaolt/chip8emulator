@@ -64,9 +64,22 @@ int keypad_thread(void *arg) {
     return 0;
 }
 
+int main(int argc, char **argv) {
+    (void) argc; (void) argv;
 
-int display_draw_thread(void *arg) {
-    chip8emu * cpu = (chip8emu*) arg;
+    mtx_init(&draw_mtx, mtx_plain);
+    mtx_init(&key_mtx, mtx_plain);
+    cnd_init(&draw_cnd);
+
+    chip8emu* cpu= chip8emu_new();
+    cpu->draw = &draw_callback;
+    cpu->keystate = &keystate_callback;
+    cpu->beep = &beep_callback;
+
+    chip8emu_load_rom(cpu, "/home/thaolt/Workspaces/roms/TETRIS");
+    chip8emu_set_cpu_speed(cpu, 1200);
+    chip8emu_start(cpu);
+
 
     int w = 640;
     int h = 320;
@@ -83,7 +96,7 @@ int display_draw_thread(void *arg) {
     }
 
     window = SDL_CreateWindow(
-            "CHIP-8 Emulator",
+            "CHIP8 Emulator",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             w, h, SDL_WINDOW_SHOWN
     );
@@ -94,11 +107,11 @@ int display_draw_thread(void *arg) {
         exit(2);
     }
 
-    // Create renderer
+    /* Create renderer */
     renderer = SDL_CreateRenderer(window, -1, 0);
     SDL_RenderSetLogicalSize(renderer, w, h);
 
-    // Create texture that stores frame buffer
+    /* Create texture that stores frame buffer */
     sdlTexture = SDL_CreateTexture(renderer,
             SDL_PIXELFORMAT_ARGB8888,
             SDL_TEXTUREACCESS_STREAMING,
@@ -144,64 +157,23 @@ int display_draw_thread(void *arg) {
             void* pixels;
             chip8emu_take_snapshot(cpu, &snapshot);
 
-            // Update SDL texture
+            /* Update SDL texture */
             SDL_LockTexture(sdlTexture, NULL, &pixels, &pitch);
             for (int i = 0; i < 2048; ++i) {
                 ((Uint32 *) pixels)[i] = snapshot.gfx[i] * 0x00FFFFFF | 0xFF000000;
             }
             SDL_UnlockTexture(sdlTexture);
-            // Clear screen and render
+
+            /* Clear screen and render */
             SDL_RenderClear(renderer);
             SDL_RenderCopy(renderer, sdlTexture, NULL, NULL);
             SDL_RenderPresent(renderer);
             draw_flag = false;
         }
         mtx_unlock(&draw_mtx);
-//        thrd_sleep(&delay, 0);
+        thrd_sleep(&delay, 0);
     }
 
-    // Emulation loop
-//    while (true) {
-//        mtx_lock(&draw_mtx);
-//        cnd_wait(&draw_cnd, &draw_mtx);
-
-
-//        mtx_unlock(&draw_mtx);
-//    }
-
-}
-
-
-int main(int argc, char **argv) {
-    (void) argc; (void) argv;
-
-    mtx_init(&draw_mtx, mtx_plain);
-    mtx_init(&key_mtx, mtx_plain);
-    cnd_init(&draw_cnd);
-
-    chip8emu* cpu= chip8emu_new();
-    cpu->draw = &draw_callback;
-    cpu->keystate = &keystate_callback;
-    cpu->beep = &beep_callback;
-
-    thrd_t thrd_draw;
-//    thrd_t thrd_keypad;
-
-//    if (thrd_create(&thrd_keypad, keypad_thread, (void*)cpu) != thrd_success) {
-//        log_error("Cannot create keypad thread!");
-//        goto quit;
-//    }
-
-    if (thrd_create(&thrd_draw, display_draw_thread, (void*)cpu) != thrd_success) {
-        log_error("Cannot create draw thread!");
-        goto quit;
-    }
-
-    chip8emu_load_rom(cpu, "E:\\Workspaces\\roms\\TETRIS");
-    chip8emu_set_cpu_speed(cpu, 1200);
-    chip8emu_start(cpu);
-
-    thrd_join(thrd_draw, NULL);
 
 quit:
     return 0;
