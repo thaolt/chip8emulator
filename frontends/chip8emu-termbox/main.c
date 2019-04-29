@@ -384,6 +384,12 @@ int main(int argc, char **argv) {
     (void)argc;
     basedir = dirname(argv[0]);
 
+
+    thrd_sleep(&(struct timespec){
+                   .tv_sec = 0,
+                   .tv_nsec = 10000000
+               }, NULL);
+
     int ret = tbui_init();
     if (ret) {
         log_error("tb_init() failed with error code %d\n", ret);

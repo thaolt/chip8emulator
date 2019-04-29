@@ -242,12 +242,13 @@ void tbui_child_remove(tbui_widget_t *parent, tbui_widget_t *child)
             if (new_size) {
                 tbui_widget_t** new_children = malloc(new_size);
                 if (i > 0)
-                    memcpy(new_children, parent->children[0], child_size * (unsigned long)i);
+                    memcpy(new_children, parent->children, child_size * (unsigned long)i);
                 if (i < parent->children_count - 1) {
                     memcpy(
                         new_children + ((unsigned long)i*child_size),
-                        parent->children[i+1],
-                        (unsigned long)(parent->children_count - (i + 1)) * child_size
+                        parent->children + ((unsigned long)(i+1)* child_size),
+                        (unsigned long)(parent->children_count - (i + 1
+                                                                  )) * child_size
                     );
                 }
                 parent->children = new_children;
