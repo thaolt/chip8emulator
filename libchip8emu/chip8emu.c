@@ -383,9 +383,13 @@ int _chip8emu_opcode_handler_E(chip8emu* emu) {
 int _chip8emu_opcode_handler_F(chip8emu* emu) {
     switch (emu->opcode & 0x00FF) {
     case 0x0007: /* FX07: Sets VX to the value of the delay timer */
+#ifndef CHIP8EMU_NO_THREAD
         mtx_lock(emu->mtx_timers);
+#endif
         emu->V[(emu->opcode & 0x0F00) >> 8] = emu->delay_timer;
+#ifndef CHIP8EMU_NO_THREAD
         mtx_unlock(emu->mtx_timers);
+#endif
         emu->pc += 2;
         break;
     case 0x000A: /* FX0A: A key press is awaited, and then stored in VX. (blocking) */
@@ -398,15 +402,23 @@ int _chip8emu_opcode_handler_F(chip8emu* emu) {
         }
         break;
     case 0x0015: /* FX15: Sets the delay timer to VX */
+#ifndef CHIP8EMU_NO_THREAD
         mtx_lock(emu->mtx_timers);
+#endif
         emu->delay_timer = emu->V[(emu->opcode & 0x0F00) >> 8];
+#ifndef CHIP8EMU_NO_THREAD
         mtx_unlock(emu->mtx_timers);
+#endif
         emu->pc += 2;
         break;
     case 0x0018: /* FX18: Sets the sound timer to VX */
+#ifndef CHIP8EMU_NO_THREAD
         mtx_lock(emu->mtx_timers);
+#endif
         emu->sound_timer = emu->V[(emu->opcode & 0x0F00) >> 8];
+#ifndef CHIP8EMU_NO_THREAD
         mtx_unlock(emu->mtx_timers);
+#endif
         emu->pc += 2;
         break;
     case 0x001E: /* FX1E: Add VX to I register */
