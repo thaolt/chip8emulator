@@ -14,7 +14,7 @@
 
 #define DISP_FG TB_GREEN
 #define DISP_BG TB_BLACK
-#define CONTAINER_WIDTH 92
+#define CONTAINER_WIDTH 80
 #define CONTAINER_MIN_HEIGHT 25
 
 static mtx_t draw_mtx;
@@ -28,6 +28,8 @@ static tbui_frame_t *disp_pane;
 static tbui_frame_t *keymap_pane;
 static chip8emu *emu;
 static char * basedir;
+static int cpu_clk_speed = 500;
+static int timer_clk_speed = 60;
 
 static char *default_keymap[0x10] = {
     "1", "2", "3", "4",
@@ -66,18 +68,18 @@ static uint32_t keymap_dispay[0x10] = {
 
 void cpu_pane_draw_content(tbui_widget_t *widget) {
     for (int i = 0; i < 16; ++i) {
-        tbui_printf(widget, 17, 1 + i, 0, 0, " V%X %02X", i, emu->V[i]);
+        tbui_printf(widget, 1 + (6 * (i/8)), 9 + i%8, 0, 0, "V%X %02X", i, emu->V[i]);
     }
-    tbui_printf(widget, 2, 1, 0, 0, "CLK");
-    tbui_printf(widget, 2, 2, 0, 0, "  CPU %4dHz", chip8emu_get_cpu_speed(emu));
-    tbui_printf(widget, 2, 3, 0, 0, "  TMR %4dHz", chip8emu_get_timer_speed(emu));
+    tbui_printf(widget, 1, 1, 0, 0, "CLK");
+    tbui_printf(widget, 1, 2, 0, 0, " CPU %4dHz", cpu_clk_speed);
+    tbui_printf(widget, 1, 3, 0, 0, " TMR %4dHz", timer_clk_speed);
 
-    tbui_printf(widget, 2, 4, 0, 0, "DT #%02X", snapshot.delay_timer);
-    tbui_printf(widget, 2, 5, 0, 0, "ST #%02X", snapshot.sound_timer);
+    tbui_printf(widget, 1, 4, 0, 0, "DT #%02X", snapshot.delay_timer);
+    tbui_printf(widget, 1, 5, 0, 0, "ST #%02X", snapshot.sound_timer);
 
-    tbui_printf(widget, 2, 6, 0, 0, "PC #%04X", snapshot.pc);
-    tbui_printf(widget, 2, 7, 0, 0, " I #%04X", snapshot.I);
-    tbui_printf(widget, 2, 8, 0, 0, "SP #%02X", snapshot.sp);
+    tbui_printf(widget, 1, 6, 0, 0, "PC #%04X", snapshot.pc);
+    tbui_printf(widget, 1, 7, 0, 0, " I #%04X", snapshot.I);
+    tbui_printf(widget, 1, 8, 0, 0, "SP #%02X", snapshot.sp);
 }
 
 void draw_keyboard(tbui_widget_t *widget) {
@@ -134,16 +136,16 @@ void draw_toolbar(tbui_widget_t *widget) {
     col += 9;
 
     tbui_print(widget, " ^O", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Load ROM", col + 4, line2y, 0, 0);
-    col += 13;
+    tbui_print(widget, "LdROM", col + 4, line2y, 0, 0);
+    col += 10;
 
     tbui_print(widget, "SPC", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Pause", col + 4, line2y, 0, 0);
     col += 10;
 
     tbui_print(widget, " ^R", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Reset", col + 4, line2y, 0, 0);
-    col += 10;
+    tbui_print(widget, "RST", col + 4, line2y, 0, 0);
+    col += 8;
 
     tbui_print(widget, " ^[", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "ClkDn", col + 4, line2y, 0, 0);
@@ -154,12 +156,12 @@ void draw_toolbar(tbui_widget_t *widget) {
     col += 10;
 
     tbui_print(widget, " ^M", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "QSave", col + 4, line2y, 0, 0);
-    col += 10;
+    tbui_print(widget, "Sv", col + 4, line2y, 0, 0);
+    col += 7;
 
     tbui_print(widget, " ^L", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "QLoad", col + 4, line2y, 0, 0);
-    col += 10;
+    tbui_print(widget, "Ld", col + 4, line2y, 0, 0);
+    col += 7;
 
     tbui_print(widget, " ^H", col, line2y, TB_BLACK, TB_WHITE);
     tbui_print(widget, "Help", col + 4, line2y, 0, 0);
@@ -180,7 +182,7 @@ void beep_callback() {
 void draw_callback(chip8emu *emu) {
     (void)emu;
     mtx_lock(&draw_mtx);
-    cnd_signal(&draw_cnd);
+    cnd_broadcast(&draw_cnd);
     mtx_unlock(&draw_mtx);
 }
 
@@ -208,7 +210,7 @@ static void setup_ui() {
     cpu_pane = tbui_new_frame(container);
     cpu_pane->title = "[ CPU ]";
     cpu_pane->title_align = TBUI_ALIGN_LEFT;
-    tbui_set_bound(cpu_pane->widget, 66, 0, 26, 18);
+    tbui_set_bound(cpu_pane->widget, 66, 0, 14, 18);
     tbui_set_visible(cpu_pane->widget, true);
     tbui_child_append(container, cpu_pane->widget);
     cpu_pane->widget->custom_draw = &cpu_pane_draw_content;
@@ -269,7 +271,7 @@ int display_draw_thread(void *arg) {
     char *fps_str = calloc(sizeof (char), 40);
     disp_pane->footnote = fps_str;
     while (true) {
-        mtx_lock(&draw_mtx);
+//        mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
         chip8emu_take_snapshot(emu, &snapshot);
         tbui_redraw(disp_pane->widget);
@@ -283,7 +285,7 @@ int display_draw_thread(void *arg) {
             start_time = (uint32_t)time(NULL);
             frame_count = 0;
         }
-        mtx_unlock(&draw_mtx);
+//        mtx_unlock(&draw_mtx);
     }
 }
 
@@ -325,10 +327,16 @@ int keypad_thread(void *arg) {
                 chip8emu_reset(emu);
                 break;
             case TB_KEY_CTRL_RSQ_BRACKET:
-                chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) + 100);
+                mtx_lock(&draw_mtx);
+                cpu_clk_speed += 100;
+                chip8emu_set_cpu_speed(emu, cpu_clk_speed);
+                mtx_unlock(&draw_mtx);
                 break;
             case TB_KEY_CTRL_LSQ_BRACKET:
-                chip8emu_set_cpu_speed(emu, chip8emu_get_cpu_speed(emu) - 100);
+                mtx_lock(&draw_mtx);
+                cpu_clk_speed -= 100;
+                chip8emu_set_cpu_speed(emu, cpu_clk_speed);
+                mtx_unlock(&draw_mtx);
                 break;
             case TB_KEY_SPACE:
                 if (emu->paused) {
@@ -412,7 +420,8 @@ int main(int argc, char **argv) {
     thrd_t thrd_keypad;
 
     chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    chip8emu_set_cpu_speed(emu, 1200);
+    cpu_clk_speed = 800;
+    chip8emu_set_cpu_speed(emu, cpu_clk_speed);
     chip8emu_start(emu);
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
