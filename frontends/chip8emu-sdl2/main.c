@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     }
 
     /* Create renderer */
-    renderer = SDL_CreateRenderer(window, -1, 0);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     SDL_RenderSetLogicalSize(renderer, w, h);
 
     /* Create texture that stores frame buffer */
