@@ -143,20 +143,20 @@ chip8emu *chip8emu_new(void)
     emu->thrd_cpu_cycle = malloc(sizeof (thrd_t));
 
     emu->mtx_cpu = malloc(sizeof (mtx_t));
-    //mtx_init(emu->mtx_cpu, mtx_plain);
+    mtx_init(emu->mtx_cpu, mtx_plain);
     emu->mtx_timers = malloc(sizeof (mtx_t));
-    //mtx_init(emu->mtx_timers, mtx_plain);
+    mtx_init(emu->mtx_timers, mtx_plain);
     emu->mtx_pause = malloc(sizeof (mtx_t));
-    //mtx_init(emu->mtx_pause, mtx_plain);
+    mtx_init(emu->mtx_pause, mtx_plain);
 
     emu->cnd_clk_cpu = malloc(sizeof (cnd_t));
-    //cnd_init(emu->cnd_clk_cpu);
+    cnd_init(emu->cnd_clk_cpu);
     emu->cnd_clk_timers = malloc(sizeof (cnd_t));
-    //cnd_init(emu->cnd_clk_timers);
+    cnd_init(emu->cnd_clk_timers);
     emu->cnd_resume_cpu = malloc(sizeof (cnd_t));
-    //cnd_init(emu->cnd_resume_cpu);
+    cnd_init(emu->cnd_resume_cpu);
     emu->cnd_resume_timers = malloc(sizeof (cnd_t));
-    //cnd_init(emu->cnd_resume_timers);
+    cnd_init(emu->cnd_resume_timers);
 #endif /* CHIP8EMU_NO_THREAD */
 
     return emu;
@@ -276,7 +276,7 @@ int _chip8emu_opcode_handler_8(chip8emu* emu) {
         } else {
             emu->V[0xF] = 1;
         }
-        emu->V[(emu->opcode & 0x0F00) >> 8] += emu->V[(emu->opcode & 0x00F0) >> 4];
+        emu->V[(emu->opcode & 0x0F00) >> 8] -= emu->V[(emu->opcode & 0x00F0) >> 4];
         emu->pc += 2;
         break;
     case 0x0006: /* 8XY6: Vx>>=1; Stores the least significant bit of VX in VF and then shifts VX to the right by 1 */
@@ -333,19 +333,22 @@ int _chip8emu_opcode_handler_C(chip8emu* emu) {
 
 int _chip8emu_opcode_handler_D(chip8emu* emu) {
     /* DXYN: draw(Vx,Vy,N); draw at X,Y width 8, height N sprite from I register */
-    uint16_t x = emu->V[(emu->opcode & 0x0F00) >> 8];
-    uint16_t y = emu->V[(emu->opcode & 0x00F0) >> 4];
-    uint16_t height = emu->opcode & 0x000F;
-    uint16_t pixel;
+    uint8_t xo = emu->V[(emu->opcode & 0x0F00) >> 8]; /* x origin */
+    uint8_t yo = emu->V[(emu->opcode & 0x00F0) >> 4];
+    uint8_t height = emu->opcode & 0x000F;
+    uint8_t sprite[0x10] = {0};
+
+    memcpy(sprite, emu->memory + (emu->I * sizeof (uint8_t)), height);
 
     emu->V[0xF] = 0;
-    for (int yline = 0; yline < height; yline++) {
-        pixel = emu->memory[emu->I + yline];
-        for(int xline = 0; xline < 8; xline++) {
-            if((pixel & (0x80 >> xline)) != 0) {
-                if(emu->gfx[(x + xline + ((y + yline) * 64))] == 1)
+    for (uint8_t y = 0; y < height; y++) {
+        for (uint8_t x = 0; x < 8; x++) {
+            int dx = (xo + x) % 64; /* display x or dest x*/
+            int dy = (yo + y) % 32;
+            if ((sprite[y] & (0x80 >> x)) != 0) { /* 0x80 -> 10000000b */
+                if (!emu->V[0xF] && emu->gfx[(dx + (dy * 64))])
                     emu->V[0xF] = 1;
-                emu->gfx[x + xline + ((y + yline) * 64)] ^= 1;
+                emu->gfx[dx + (dy * 64)] ^= 1;
             }
         }
     }
@@ -380,7 +383,9 @@ int _chip8emu_opcode_handler_E(chip8emu* emu) {
 int _chip8emu_opcode_handler_F(chip8emu* emu) {
     switch (emu->opcode & 0x00FF) {
     case 0x0007: /* FX07: Sets VX to the value of the delay timer */
+        mtx_lock(emu->mtx_timers);
         emu->V[(emu->opcode & 0x0F00) >> 8] = emu->delay_timer;
+        mtx_unlock(emu->mtx_timers);
         emu->pc += 2;
         break;
     case 0x000A: /* FX0A: A key press is awaited, and then stored in VX. (blocking) */
@@ -393,11 +398,15 @@ int _chip8emu_opcode_handler_F(chip8emu* emu) {
         }
         break;
     case 0x0015: /* FX15: Sets the delay timer to VX */
+        mtx_lock(emu->mtx_timers);
         emu->delay_timer = emu->V[(emu->opcode & 0x0F00) >> 8];
+        mtx_unlock(emu->mtx_timers);
         emu->pc += 2;
         break;
     case 0x0018: /* FX18: Sets the sound timer to VX */
+        mtx_lock(emu->mtx_timers);
         emu->sound_timer = emu->V[(emu->opcode & 0x0F00) >> 8];
+        mtx_unlock(emu->mtx_timers);
         emu->pc += 2;
         break;
     case 0x001E: /* FX1E: Add VX to I register */
@@ -408,7 +417,7 @@ int _chip8emu_opcode_handler_F(chip8emu* emu) {
         emu->I = emu->V[(emu->opcode & 0x0F00) >> 8] * 5;
         emu->pc += 2;
         break;
-    case 0x0033: /* FX33: */
+    case 0x0033: /* FX33: Store a Binary Coded Decimal (BCD) of register VX to memory started from I */
         emu->memory[emu->I]     = emu->V[(emu->opcode & 0x0F00) >> 8] / 100;
         emu->memory[emu->I + 1] = (emu->V[(emu->opcode & 0x0F00) >> 8] / 10) % 10;
         emu->memory[emu->I + 2] = emu->V[(emu->opcode & 0x0F00) >> 8] % 10;
@@ -488,15 +497,12 @@ void chip8emu_timer_tick(chip8emu *emu)
 static int chip8emu_thread_clk_timers(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     while (true) {
-
         mtx_lock(emu->mtx_pause);
         if (emu->paused)
             cnd_wait(emu->cnd_resume_timers, emu->mtx_pause);
         mtx_unlock(emu->mtx_pause);
 
-        mtx_lock(emu->mtx_timers);
         cnd_signal(emu->cnd_clk_timers);
-        mtx_unlock(emu->mtx_timers);
 
         thrd_sleep(emu->_timer_clk_delay, 0);
     }
@@ -511,11 +517,9 @@ static int chip8emu_thread_clk_cpu(void *arg) {
             cnd_wait(emu->cnd_resume_cpu, emu->mtx_pause);
         mtx_unlock(emu->mtx_pause);
 
-        mtx_lock(emu->mtx_timers);
         mtx_lock(emu->mtx_cpu);
         cnd_signal(emu->cnd_clk_cpu);
         mtx_unlock(emu->mtx_cpu);
-        mtx_unlock(emu->mtx_timers);
 
         thrd_sleep(emu->_cpu_clk_delay, 0);
     }
