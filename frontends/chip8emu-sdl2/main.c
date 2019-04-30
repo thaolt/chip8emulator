@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
 
     window = SDL_CreateWindow(
             "CHIP8 Emulator",
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
             w, h, SDL_WINDOW_SHOWN
     );
 

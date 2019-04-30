@@ -68,7 +68,7 @@ static uint32_t keymap_dispay[0x10] = {
 
 void cpu_pane_draw_content(tbui_widget_t *widget) {
     for (int i = 0; i < 16; ++i) {
-        tbui_printf(widget, 1 + (6 * (i/8)), 9 + i%8, 0, 0, "V%X %02X", i, emu->V[i]);
+        tbui_printf(widget, 1 + (7 * (i/8)), 9 + i%8, 0, 0, "V%X %02X", i, emu->V[i]);
     }
     tbui_printf(widget, 1, 1, 0, 0, "CLK");
     tbui_printf(widget, 1, 2, 0, 0, " CPU %4dHz", cpu_clk_speed);
