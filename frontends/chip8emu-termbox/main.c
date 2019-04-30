@@ -289,7 +289,7 @@ int display_draw_thread(void *arg) {
     char *fps_str = calloc(sizeof (char), 40);
     disp_pane->footnote = fps_str;
     while (true) {
-//        mtx_lock(&draw_mtx);
+        mtx_lock(&draw_mtx);
         cnd_wait(&draw_cnd, &draw_mtx);
         chip8emu_take_snapshot(emu, &snapshot);
         tbui_redraw(disp_pane->widget);
@@ -303,7 +303,7 @@ int display_draw_thread(void *arg) {
             start_time = (uint32_t)time(NULL);
             frame_count = 0;
         }
-//        mtx_unlock(&draw_mtx);
+        mtx_unlock(&draw_mtx);
     }
 }
 
@@ -442,7 +442,7 @@ int main(int argc, char **argv) {
     thrd_t thrd_keypad;
 
     chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    cpu_clk_speed = 1200;
+    cpu_clk_speed = 5000;
     chip8emu_set_cpu_speed(emu, cpu_clk_speed);
     chip8emu_start(emu);
 

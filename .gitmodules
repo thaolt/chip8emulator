@@ -19,3 +19,6 @@
 [submodule "3rdparty/libucl"]
 	path = 3rdparty/libucl
 	url = https://github.com/vstakhov/libucl.git
+[submodule "3rdparty/uthash"]
+	path = 3rdparty/uthash
+	url = https://github.com/troydhanson/uthash.git
