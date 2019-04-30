@@ -26,6 +26,8 @@ static tbui_widget_t * container;
 static tbui_frame_t *cpu_pane;
 static tbui_frame_t *disp_pane;
 static tbui_frame_t *keymap_pane;
+static tbui_frame_t *opcode_pane;
+static tbui_frame_t *logs_pane;
 static chip8emu *emu;
 static char * basedir;
 static int cpu_clk_speed = 500;
@@ -128,43 +130,44 @@ void draw_toolbar(tbui_widget_t *widget) {
     /* int line1y = bound->h - 2;*/
     int line2y = bound->h - 1;
     int col_w = 14;
+    int x = (tb_width() - CONTAINER_WIDTH)/2 - (tb_width() - CONTAINER_WIDTH)%2;
     int col_idx = 0;
     int col = col_idx * col_w;
 
-    tbui_print(widget, " ^X", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Exit", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^X", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Exit", x + col + 4, line2y, 0, 0);
     col += 9;
 
-    tbui_print(widget, " ^O", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "LdROM", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^O", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "LdROM", x + col + 4, line2y, 0, 0);
     col += 10;
 
-    tbui_print(widget, "SPC", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Pause", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^P", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Pause", x + col + 4, line2y, 0, 0);
     col += 10;
 
-    tbui_print(widget, " ^R", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "RST", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^R", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "RST", x + col + 4, line2y, 0, 0);
     col += 8;
 
-    tbui_print(widget, " ^[", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "ClkDn", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^[", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "ClkDn", x + col + 4, line2y, 0, 0);
     col += 10;
 
-    tbui_print(widget, " ^]", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "ClkUp", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^]", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "ClkUp", x + col + 4, line2y, 0, 0);
     col += 10;
 
-    tbui_print(widget, " ^M", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Sv", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^M", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Sv", x + col + 4, line2y, 0, 0);
     col += 7;
 
-    tbui_print(widget, " ^L", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Ld", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^L", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Ld", x + col + 4, line2y, 0, 0);
     col += 7;
 
-    tbui_print(widget, " ^H", col, line2y, TB_BLACK, TB_WHITE);
-    tbui_print(widget, "Help", col + 4, line2y, 0, 0);
+    tbui_print(widget, " ^H", x + col, line2y, TB_BLACK, TB_WHITE);
+    tbui_print(widget, "Help", x + col + 4, line2y, 0, 0);
     col += 9;
 
     free(bound);
@@ -202,10 +205,11 @@ static void setup_ui() {
     container = tbui_new_widget(NULL);
     tbui_set_bound(container,
         tb_width()/2 - CONTAINER_WIDTH/2 - CONTAINER_WIDTH%2,
-        0, CONTAINER_WIDTH, tb_height());
+        0, CONTAINER_WIDTH, tb_height()-1);
     tbui_set_visible(container, true);
     tbui_child_append(NULL, container);
-    tbui_set_user_draw_func(container, &draw_toolbar);
+
+    tbui_set_user_draw_func(NULL, &draw_toolbar);
 
     cpu_pane = tbui_new_frame(container);
     cpu_pane->title = "[ CPU ]";
@@ -254,6 +258,20 @@ static void setup_ui() {
     tbui_set_visible(keymap_pane->widget, true);
     tbui_child_append(container, keymap_pane->widget);
     keymap_pane->widget->custom_draw = &draw_keyboard;
+
+    opcode_pane = tbui_new_frame(container);
+    opcode_pane->title = "[ OpCodes ]";
+    opcode_pane->title_align = TBUI_ALIGN_LEFT;
+    tbui_set_bound(opcode_pane->widget, 14, 18, 20, 255);
+    tbui_set_visible(opcode_pane->widget, true);
+    tbui_child_append(container, opcode_pane->widget);
+
+    logs_pane = tbui_new_frame(container);
+    logs_pane->title = "[ Logs ]";
+    logs_pane->title_align = TBUI_ALIGN_LEFT;
+    tbui_set_bound(logs_pane->widget, 34, 18, 255, 255);
+    tbui_set_visible(logs_pane->widget, true);
+    tbui_child_append(container, logs_pane->widget);
 
     tbui_redraw(NULL);
 }
@@ -338,7 +356,7 @@ int keypad_thread(void *arg) {
                 chip8emu_set_cpu_speed(emu, cpu_clk_speed);
                 mtx_unlock(&draw_mtx);
                 break;
-            case TB_KEY_SPACE:
+            case TB_KEY_CTRL_P:
                 if (emu->paused) {
                     disp_pane->widget->children[1]->visible = false;
                     tbui_redraw(NULL);
@@ -373,13 +391,18 @@ int keypad_thread(void *arg) {
             }
 
         if (ev.type == TB_EVENT_RESIZE) {
+            thrd_sleep(&(struct timespec){
+                           .tv_sec = 0,
+                           .tv_nsec = 500000000
+                       }, NULL);
             mtx_lock(&draw_mtx);
+            tbui_set_bound(NULL, 0, 0, tb_width(), tb_height());
             tbui_set_bound(
                 container,
                 tb_width()/2 - CONTAINER_WIDTH/2 - CONTAINER_WIDTH%2,
                 0,
                 CONTAINER_WIDTH,
-                tb_height()
+                tb_height()-1
             );
             tb_clear(); tbui_redraw(NULL);
             mtx_unlock(&draw_mtx);
@@ -392,10 +415,9 @@ int main(int argc, char **argv) {
     (void)argc;
     basedir = dirname(argv[0]);
 
-
     thrd_sleep(&(struct timespec){
                    .tv_sec = 0,
-                   .tv_nsec = 10000000
+                   .tv_nsec = 500000000
                }, NULL);
 
     int ret = tbui_init();
@@ -420,7 +442,7 @@ int main(int argc, char **argv) {
     thrd_t thrd_keypad;
 
     chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    cpu_clk_speed = 800;
+    cpu_clk_speed = 1200;
     chip8emu_set_cpu_speed(emu, cpu_clk_speed);
     chip8emu_start(emu);
 

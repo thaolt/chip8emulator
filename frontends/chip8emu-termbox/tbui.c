@@ -63,6 +63,7 @@ static void _frame_dtor(tbui_widget_t* widget) {
 
 int tbui_init()
 {
+    int retcode = tb_init();
     _root_widget = malloc(sizeof (tbui_widget_t));
     _root_widget->visible = true;
     _root_widget->children = NULL;
@@ -76,7 +77,7 @@ int tbui_init()
     _root_widget->bound->w = tb_width();
     _root_widget->bound->h = tb_height();
     _root_widget->parent = NULL;
-    return tb_init();
+    return retcode;
 }
 
 void tbui_change_cell(tbui_widget_t* widget, int x, int y, uint32_t ch, uint16_t fg, uint16_t bg)
@@ -360,8 +361,8 @@ tbui_bound_t* tbui_real_bound(tbui_widget_t *widget)
     tbui_bound_t *parent_bound = tbui_real_bound(widget->parent);
     yield_bound->x = widget->bound->x + parent_bound->x;
     yield_bound->y = widget->bound->y + parent_bound->y;
-    yield_bound->w = widget->bound->w;
-    yield_bound->h = widget->bound->h;
+    yield_bound->w = (parent_bound->w - widget->bound->x) >= widget->bound->w ? widget->bound->w : (parent_bound->w - widget->bound->x);
+    yield_bound->h = (parent_bound->h - widget->bound->y) >= widget->bound->h ? widget->bound->h : (parent_bound->h - widget->bound->y);
     free(parent_bound);
     return yield_bound;
 }
@@ -409,6 +410,8 @@ tbui_label_t *tbui_new_label(tbui_widget_t *parent)
 
 void tbui_set_bound(tbui_widget_t *widget, int x, int y, int w, int h)
 {
+    if (!widget)
+        widget = _root_widget;
     widget->bound->x = x;
     widget->bound->y = y;
     widget->bound->w = w;
@@ -432,6 +435,8 @@ void tbui_hide(tbui_widget_t *widget)
 
 void tbui_set_user_draw_func(tbui_widget_t *widget, void (*func)(tbui_widget_t *))
 {
+    if (!widget)
+        widget = _root_widget;
     widget->custom_draw = func;
 }
 
