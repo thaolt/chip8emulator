@@ -54,6 +54,11 @@ static int _chip8emu_opcode_handler_D(chip8emu* emu);
 static int _chip8emu_opcode_handler_E(chip8emu* emu);
 static int _chip8emu_opcode_handler_F(chip8emu* emu);
 
+static uint8_t _chip8emu_timer_delay(chip8emu* emu);
+static void _chip8emu_timer_delay_set(chip8emu* emu, uint8_t val);
+
+static void _chip8emu_timer_sound_set(chip8emu* emu, uint8_t val);
+
 /* Default font set */
 static uint8_t chip8_fontset[80] =
 {
@@ -181,13 +186,14 @@ int _chip8emu_opcode_handler_0(chip8emu* emu) {
         break;
 
     default: /* 0NNN: call program at NNN address */
+        _chip8emu_log_error(emu, "OpCode 0NNN is not implemented");
         break;
     }
     return C8ERR_OK;
 }
 
 int _chip8emu_opcode_handler_1(chip8emu* emu) {
-     /* absolute jump */
+     /* 1NNN: absolute jump */
     emu->pc = emu->opcode & 0xFFF;
     return C8ERR_OK;
 }
@@ -383,13 +389,7 @@ int _chip8emu_opcode_handler_E(chip8emu* emu) {
 int _chip8emu_opcode_handler_F(chip8emu* emu) {
     switch (emu->opcode & 0x00FF) {
     case 0x0007: /* FX07: Sets VX to the value of the delay timer */
-#ifndef CHIP8EMU_NO_THREAD
-        mtx_lock(emu->mtx_timers);
-#endif
-        emu->V[(emu->opcode & 0x0F00) >> 8] = emu->delay_timer;
-#ifndef CHIP8EMU_NO_THREAD
-        mtx_unlock(emu->mtx_timers);
-#endif
+        emu->V[(emu->opcode & 0x0F00) >> 8] = _chip8emu_timer_delay(emu);;
         emu->pc += 2;
         break;
     case 0x000A: /* FX0A: A key press is awaited, and then stored in VX. (blocking) */
@@ -402,23 +402,11 @@ int _chip8emu_opcode_handler_F(chip8emu* emu) {
         }
         break;
     case 0x0015: /* FX15: Sets the delay timer to VX */
-#ifndef CHIP8EMU_NO_THREAD
-        mtx_lock(emu->mtx_timers);
-#endif
-        emu->delay_timer = emu->V[(emu->opcode & 0x0F00) >> 8];
-#ifndef CHIP8EMU_NO_THREAD
-        mtx_unlock(emu->mtx_timers);
-#endif
+        _chip8emu_timer_delay_set(emu, emu->V[(emu->opcode & 0x0F00) >> 8]);
         emu->pc += 2;
         break;
     case 0x0018: /* FX18: Sets the sound timer to VX */
-#ifndef CHIP8EMU_NO_THREAD
-        mtx_lock(emu->mtx_timers);
-#endif
-        emu->sound_timer = emu->V[(emu->opcode & 0x0F00) >> 8];
-#ifndef CHIP8EMU_NO_THREAD
-        mtx_unlock(emu->mtx_timers);
-#endif
+        _chip8emu_timer_sound_set(emu, emu->V[(emu->opcode & 0x0F00) >> 8]);
         emu->pc += 2;
         break;
     case 0x001E: /* FX1E: Add VX to I register */
@@ -686,3 +674,36 @@ void chip8emu_take_snapshot(chip8emu *emu, chip8emu_snapshot *snapshot)
 #endif /* CHIP8EMU_NO_THREAD */
 }
 
+static uint8_t _chip8emu_timer_delay(chip8emu* emu)
+{
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_lock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
+    uint8_t ret = emu->delay_timer;
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_unlock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
+    return ret;
+}
+
+static void _chip8emu_timer_delay_set(chip8emu* emu, uint8_t val)
+{
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_lock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
+    emu->delay_timer = val;
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_unlock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
+}
+
+static void _chip8emu_timer_sound_set(chip8emu* emu, uint8_t val)
+{
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_lock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
+    emu->sound_timer = val;
+#ifndef CHIP8EMU_NO_THREAD
+    mtx_unlock(emu->mtx_timers);
+#endif /* CHIP8EMU_NO_THREAD */
+}
