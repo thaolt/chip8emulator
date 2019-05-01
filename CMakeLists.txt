@@ -7,6 +7,7 @@ include_directories(${CMAKE_SOURCE_DIR}/3rdparty/termbox/origin/src)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/tinycthread/source)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/soundio)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/src)
+include_directories(${CMAKE_SOURCE_DIR}/3rdparty/tinydir)
 
 link_directories(${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 
