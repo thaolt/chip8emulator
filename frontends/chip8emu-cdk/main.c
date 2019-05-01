@@ -4,7 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-#include "log.h"
 #include "tinycthread.h"
 
 #include "chip8emu.h"

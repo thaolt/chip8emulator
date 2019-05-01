@@ -4,4 +4,4 @@ project(chip8emu-cdk)
 
 add_executable(${PROJECT_NAME} "main.c")
 
-target_link_libraries(${PROJECT_NAME} chip8emu tinycthread logc)
+target_link_libraries(${PROJECT_NAME} chip8emu tinycthread)

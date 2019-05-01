@@ -4,7 +4,6 @@
 #include <time.h>
 #include <libgen.h> /* for basename() */
 
-#include "log.h"
 #include "termbox.h"
 #include "tinycthread.h"
 #include "soundio.h"
@@ -40,19 +39,21 @@ static char *default_keymap[0x10] = {
     "z", "x", "c", "v"
 };
 
-//static char *game_keymap[0x10] = {
-//    0,      0,      0,          0,
-//    "up",   "left", "right",    "down",
-//    0,      0,      0,          0,
-//    0,      0,      0,          0
-//};
+static char *game_keymap[0x10] = {
+    0,      0,      0,          0,
+    "up",   "left", "right",    "down",
+    0,      0,      0,          0,
+    0,      0,      0,          0
+};
 
+/*
 static char *game_keymap[0x10] = {
     0,      0,      0,          0,
     "w",     "a",   "d",        "s",
     0,      0,      0,          0,
     0,      0,      0,          0
 };
+*/
 
 static uint32_t game_tb_keymap[0x10] = {
     0,      0,      0,          0,
@@ -422,7 +423,7 @@ int main(int argc, char **argv) {
 
     int ret = tbui_init();
     if (ret) {
-        log_error("tb_init() failed with error code %d\n", ret);
+        printf("tb_init() failed with error code %d\n", ret);
         return 1;
     }
 
@@ -441,18 +442,22 @@ int main(int argc, char **argv) {
     thrd_t thrd_draw;
     thrd_t thrd_keypad;
 
-    chip8emu_load_rom(emu, "/home/thaolt/Workspaces/roms/TETRIS");
-    cpu_clk_speed = 5000;
+    char rom_file[1024] = {0};
+    strcat(rom_file, basedir);
+    strcat(rom_file, "/roms/TETRIS");
+
+    chip8emu_load_rom(emu, rom_file);
+    cpu_clk_speed = 1500;
     chip8emu_set_cpu_speed(emu, cpu_clk_speed);
     chip8emu_start(emu);
 
     if (thrd_create(&thrd_draw, display_draw_thread, (void*)emu) != thrd_success) {
-        log_error("Cannot create draw thread!");
+        printf("Cannot create draw thread!");
         goto quit;
     }
 
     if (thrd_create(&thrd_keypad, keypad_thread, (void*)emu) != thrd_success) {
-        log_error("Cannot create keypad thread!");
+        printf("Cannot create keypad thread!");
         goto quit;
     }
 

@@ -19,7 +19,6 @@ target_link_libraries(${PROJECT_NAME}
     chip8emu
     tinycthread
     termbox
-    logc
     libsoundio_static ${LIBSOUNDIO_LIBS} 
     ${LIBM}
 )

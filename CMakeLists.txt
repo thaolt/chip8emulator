@@ -4,7 +4,6 @@ project(chip8emulator)
 
 include_directories(${CMAKE_SOURCE_DIR}/libchip8emu)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/termbox/origin/src)
-include_directories(${CMAKE_SOURCE_DIR}/3rdparty/log.c/origin/src)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/tinycthread/source)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/soundio)
 include_directories(${CMAKE_SOURCE_DIR}/3rdparty/libsoundio/src)

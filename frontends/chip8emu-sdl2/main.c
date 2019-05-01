@@ -5,7 +5,6 @@
 #include "SDL2/SDL.h"
 #endif
 
-#include "log.h"
 #include "tinycthread.h"
 #include "chip8emu.h"
 
