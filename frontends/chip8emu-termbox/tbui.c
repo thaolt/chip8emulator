@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <libgen.h>
 
 #include "termbox.h"
 
@@ -511,7 +512,8 @@ int tbui_exdiaglog_openfile(char *out_filename,
     int diag_h = 22;
     int retcode = false;
     bool finish = false;
-    char * curdir = strdup(start_dir);
+    char curdir[1024] = {0};
+    strcpy(curdir, start_dir);
     if (!filter_func) filter_func = &_filedialog_dummy_filter;
 
     /* setup */
@@ -526,27 +528,143 @@ int tbui_exdiaglog_openfile(char *out_filename,
     frame->border_style = TBUI_BORDER_THIN_SHADOW;
     tbui_set_visible(frame->widget, true);
     tbui_child_append(_root_widget, frame->widget);
+    uint8_t tab_idx = 0;
+    uint8_t max_lines = (uint8_t)diag_h - 6;
+    uint8_t top_idx_file = 0;
+    uint8_t top_idx_dir = 0;
+    uint8_t sel_idx_file = 0;
+    uint8_t sel_idx_dir = 0;
 
-    struct dirent **namelist;
-    int entries_count = scandir(curdir, &namelist, NULL, alphasort);
     tbui_redraw(NULL);
-    tbui_fill_rect(frame->widget, 1, 1, diag_w - 2, diag_h - 2, ' ', 0, 0);
-    tb_present();
 
     /* event loop */
     struct tb_event ev;
     while (!finish) {
+        /* drawing */
+        tbui_fill_rect(frame->widget, 1, 1, diag_w - 2, diag_h - 2, ' ', 0, 0);
+
+        struct dirent **namelist;
+        int entries_count = scandir(curdir, &namelist, NULL, alphasort);
+        int idx_dir = -1, idx_file = -1;
+
+        tbui_printf(frame->widget, 1, 1, 0, 0, "%s", "Current directory:");
+        if (strlen(curdir) < 50) {
+            tbui_printf(frame->widget, 1, 2, 0, 0, "%s", curdir);
+        } else {
+            tbui_printf(frame->widget, 1, 2, 0, 0, "%.50s%s", curdir, "...");
+        }
+
+        if (tab_idx == 0) {
+            tbui_fill_rect(frame->widget, 2, 4, 25, max_lines, ' ', TB_WHITE, TB_BLUE);
+        } else {
+            tbui_fill_rect(frame->widget, 28, 4, 26, max_lines, ' ', TB_WHITE, TB_BLUE);
+        }
+
+        for (int i = 0; i < entries_count; ++i) {
+            if (namelist[i]->d_type == DT_DIR) {
+                idx_dir++;
+                if (idx_dir < top_idx_dir) continue;
+                if (idx_dir - top_idx_dir < max_lines) {
+                    if (tab_idx == 0) {
+                        if (sel_idx_dir + top_idx_dir == idx_dir)
+                            tbui_printf(frame->widget, 2, 4 + idx_dir - top_idx_dir, TB_BLUE, TB_YELLOW, "%-25.25s", namelist[i]->d_name);
+                        else
+                            tbui_printf(frame->widget, 2, 4 + idx_dir - top_idx_dir, TB_WHITE, TB_BLUE, "%-25.25s", namelist[i]->d_name);
+                    } else {
+                        tbui_printf(frame->widget, 2, 4 + idx_dir - top_idx_dir, 0, 0, "%-25.25s", namelist[i]->d_name);
+                    }
+                }
+            } else {
+                idx_file++;
+                if (idx_file < top_idx_file) continue;
+                if (idx_file - top_idx_file < max_lines) {
+                    if (tab_idx == 1) {
+                        if (sel_idx_file + top_idx_file == idx_file)
+                            tbui_printf(frame->widget, 28, 4 + idx_file - top_idx_file, TB_BLUE, TB_YELLOW, "%-26s", namelist[i]->d_name);
+                        else
+                            tbui_printf(frame->widget, 28, 4 + idx_file - top_idx_file, TB_WHITE, TB_BLUE, "%-26s", namelist[i]->d_name);
+                    } else {
+                        tbui_printf(frame->widget, 28, 4 + idx_file - top_idx_file, 0, 0, "%-26s", namelist[i]->d_name);
+                    }
+
+                }
+            }
+        }
+        tb_present();
+
+        /* event loop */
         tb_poll_event(&ev);
         if (ev.type != TB_EVENT_KEY)
             continue;
         switch (ev.key) {
         case TB_KEY_TAB:
+            tab_idx = !tab_idx;
             break;
         case TB_KEY_ENTER:
+            if (tab_idx == 0) {
+                uint8_t counter = 0;
+                for (int i = 0; i < entries_count; ++i) {
+                    if (namelist[i]->d_type == DT_DIR) {
+                        if (counter == sel_idx_dir + top_idx_dir) {
+                            if (strcmp("..", namelist[i]->d_name) == 0) {
+                                strcpy(curdir, dirname(curdir));
+                            } else if (strcmp(".", namelist[i]->d_name) != 0) {
+                                strcat(curdir, "/");
+                                strcat(curdir, namelist[i]->d_name);
+                            }
+                            sel_idx_dir = 0;
+                            top_idx_dir = 0;
+                            break;
+                        }
+                        counter++;
+                    }
+                }
+            } else {
+                uint8_t counter = 0;
+                for (int i = 0; i < entries_count; ++i) {
+                    if (namelist[i]->d_type != DT_DIR) {
+                        if (counter == sel_idx_file + top_idx_file) {
+                            strcat(out_filename, curdir);
+                            strcat(out_filename, "/");
+                            strcat(out_filename, namelist[i]->d_name);
+                            finish = true;
+                            retcode = true;
+                            break;
+                        }
+                        counter++;
+                    }
+                }
+            }
             break;
         case TB_KEY_ARROW_UP:
+            if (tab_idx == 0) {
+                if (sel_idx_dir > 0)
+                    sel_idx_dir--;
+                else if (top_idx_dir > 0)
+                    top_idx_dir--;
+            } else {
+                if (sel_idx_file > 0)
+                    sel_idx_file--;
+                else if (top_idx_file > 0)
+                    top_idx_file--;
+            }
             break;
         case TB_KEY_ARROW_DOWN:
+            if (tab_idx == 0) {
+                if (sel_idx_dir < idx_dir) {
+                    if (sel_idx_dir < max_lines - 1)
+                        sel_idx_dir++;
+                    else if (top_idx_dir + max_lines < idx_dir)
+                        top_idx_dir++;
+                }
+            } else {
+                if (sel_idx_file < idx_file) {
+                    if (sel_idx_file < max_lines - 1)
+                        sel_idx_file++;
+                    else if (top_idx_file + max_lines < idx_file)
+                        top_idx_file++;
+                }
+            }
             break;
         case TB_KEY_ESC:
             finish = true;
@@ -556,5 +674,6 @@ int tbui_exdiaglog_openfile(char *out_filename,
 
     tbui_child_delete(_root_widget, frame->widget);
     tb_clear();
+    tbui_redraw(NULL);
     return retcode;
 }

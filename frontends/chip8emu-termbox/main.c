@@ -311,29 +311,33 @@ int display_draw_thread(void *arg) {
 int keypad_thread(void *arg) {
     chip8emu * emu = (chip8emu*) arg;
     bool quit = false;
+    char roms_path[1024] = {0};
+
+    strcat(roms_path, basedir);
+    strcat(roms_path, "/roms");
+
     struct tb_event ev;
     while (!quit) {
         tb_poll_event(&ev);
         if (ev.type == TB_EVENT_KEY)
             switch (ev.key) {
             case TB_KEY_CTRL_O: {
-                bool was_paused = emu->paused;
-                if (!was_paused)
-                    chip8emu_pause(emu);
+                chip8emu_pause(emu);
                 char filepath[1024] = {0};
                 int ok = tbui_exdiaglog_openfile(
                     filepath,
                     "[ Open ROM ]",
                     "<ESC>Cancel-<ENTER>Select-<TAB>Switch",
-                    basedir, 0
+                    roms_path, 0
                 );
-                if (ok) {
-
-                } else {
-                    if (!was_paused)
-                        chip8emu_resume(emu);
-                }
                 tbui_redraw(NULL);
+
+                if (ok) {
+                    chip8emu_load_rom(emu, filepath);
+                    chip8emu_reset(emu);
+                } else {
+                    chip8emu_resume(emu);
+                }
                 break;
             }
             case TB_KEY_CTRL_X:
@@ -429,7 +433,7 @@ int main(int argc, char **argv) {
 
     /*
     if (tb_width() < CONTAINER_WIDTH || tb_height() < CONTAINER_MIN_HEIGHT) {
-        log_error("terminal geometry (width x height) has to be at least 92x25.");
+        printf("terminal geometry (width x height) has to be at least 92x25.\n");
         goto quit;
     }
     */

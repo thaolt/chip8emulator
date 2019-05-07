@@ -100,7 +100,8 @@ tbui_frame_t* tbui_new_frame(tbui_widget_t* parent);
 tbui_label_t* tbui_new_label(tbui_widget_t* parent);
 tbui_monobitmap_t* tbui_new_monobitmap(tbui_widget_t* parent);
 
-int tbui_exdiaglog_openfile(char *out_filename,
+int tbui_exdiaglog_openfile(
+    char *out_filename,
     const char* frame_title,
     const char* frame_footnote,
     char *start_dir,

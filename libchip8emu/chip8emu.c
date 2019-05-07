@@ -576,16 +576,20 @@ void chip8emu_start(chip8emu *emu)
 void chip8emu_pause(chip8emu *emu)
 {
     mtx_lock(emu->mtx_pause);
-    emu->paused = true;
+    if (!emu->paused) {
+        emu->paused = true;
+    }
     mtx_unlock(emu->mtx_pause);
 }
 
 void chip8emu_resume(chip8emu *emu)
 {
     mtx_lock(emu->mtx_pause);
-    emu->paused = false;
-    cnd_signal(emu->cnd_resume_cpu);
-    cnd_signal(emu->cnd_resume_timers);
+    if (emu->paused == true) {
+        emu->paused = false;
+        cnd_signal(emu->cnd_resume_cpu);
+        cnd_signal(emu->cnd_resume_timers);
+    }
     mtx_unlock(emu->mtx_pause);
 }
 
