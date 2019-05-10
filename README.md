@@ -35,7 +35,7 @@ cd dist/
 
 ## Screencasts
 
-[![asciicast](https://asciinema.org/a/241423.svg)](https://asciinema.org/a/241423)
+[![asciicast](https://asciinema.org/a/245384.svg)](https://asciinema.org/a/245384)
 
 ## Screenshots
 
