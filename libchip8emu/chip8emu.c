@@ -93,10 +93,10 @@ chip8emu *chip8emu_new(void)
     emu->I      = 0;      /* Reset index register */
     emu->sp     = 0;      /* Reset stack pointer */
 
-    memset(&(emu->gfx), 0, 64 * 32);      /* Clear display */
-    memset(&(emu->stack), 0, 16 * sizeof(uint16_t));         /* Clear stack */
-    memset(&(emu->V), 0, 16);             /* Clear registers V0-VF */
-    memset(&(emu->memory), 0, 4096);      /* Clear memory */
+    memset(emu->gfx, 0, 64 * 32);      /* Clear display */
+    memset(emu->stack, 0, 16 * sizeof(uint16_t));         /* Clear stack */
+    memset(emu->V, 0, 16);             /* Clear registers V0-VF */
+    memset(emu->memory, 0, 4096);      /* Clear memory */
 
     /* Load fontset */
     for(int i = 0; i < 80; ++i)
@@ -463,21 +463,21 @@ int chip8emu_load_code(chip8emu *emu, uint8_t *code, long code_size)
 
 int chip8emu_load_rom(chip8emu *emu, const char *filename)
 {
-    FILE *fileptr;
-    uint8_t code_buffer[4096];
-    long filelen;
+    uint16_t filelen = 0;
+    FILE *f = fopen(filename, "r");
 
-    memset(code_buffer, 0, 4096);
+    if (f == NULL) {
+        _chip8emu_log_error(emu, "file %s does not exist\n", filename);
+        return 1;
+    }
+    uint8_t c;
+    while (fread(&c, 1, 1, f) != 0) {
+        emu->memory[filelen + 512] = c;
+        filelen++;
+    }
+    fclose(f);
 
-    fileptr = fopen(filename, "rb");
-    fseek(fileptr, 0, SEEK_END);
-    filelen = ftell(fileptr);
-    rewind(fileptr);
-
-    fread(code_buffer, (unsigned long) filelen, 1, fileptr);
-    fclose(fileptr);
-
-    return chip8emu_load_code(emu, code_buffer, filelen + 1);
+    return C8ERR_OK;
 }
 
 void chip8emu_timer_tick(chip8emu *emu)
