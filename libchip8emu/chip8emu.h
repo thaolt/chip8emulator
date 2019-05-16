@@ -48,6 +48,9 @@ struct chip8emu
     /* opcode handling functions, can be overrided */
     int  (*opcode_handlers[0x10])(chip8emu *);
     
+    /* random number generator */
+    int (*rand)(void);
+    
     /* API callbacks */
     void (*draw)(chip8emu *);
     bool (*keystate)(chip8emu *, uint8_t);

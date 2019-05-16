@@ -36,6 +36,10 @@ static void _dummy_logger(chip8emu *emu, int log_level, const char *file, int li
     (void)emu; (void)log_level; (void)file; (void)line; (void)message;
 }
 
+static int _default_rand(void) {
+    return rand();
+}
+
 /* opcode handling prototypes */
 static int _chip8emu_opcode_handler_0(chip8emu* emu);
 static int _chip8emu_opcode_handler_1(chip8emu* emu);
@@ -85,8 +89,6 @@ static uint8_t chip8_fontset[80] =
 chip8emu *chip8emu_new(void)
 {
     chip8emu* emu = malloc(sizeof (chip8emu));
-    /* Intializes random number generator */
-    srand((unsigned) time(NULL));
 
     emu->pc     = 0x200;  /* Program counter starts at 0x200 */
     emu->opcode = 0;      /* Reset current opcode */
@@ -109,6 +111,7 @@ chip8emu *chip8emu_new(void)
     emu->draw = 0;
     emu->keystate = 0;
     emu->beep = 0;
+    emu->rand = &_default_rand;
     emu->log = &_dummy_logger;
 
     emu->opcode_handlers[0x0] = &_chip8emu_opcode_handler_0;
@@ -332,7 +335,7 @@ int _chip8emu_opcode_handler_B(chip8emu* emu) {
 
 int _chip8emu_opcode_handler_C(chip8emu* emu) {
     /* CXNN: Vx=rand() & NN */
-    emu->V[(emu->opcode & 0x0F00) >> 8] = (rand() % (0xFF + 1)) & (emu->opcode & 0x00FF);
+    emu->V[(emu->opcode & 0x0F00) >> 8] = (emu->rand() % (0xFF + 1)) & (emu->opcode & 0x00FF);
     emu->pc += 2;
     return C8ERR_OK;
 }
