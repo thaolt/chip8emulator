@@ -32,6 +32,7 @@ cd dist/
 ## Related projects
 
 * [Chip8EMU Handheld](https://github.com/thaolt/chip8emu-handheld)
+* [Chip8EMU AppGameKit2](https://github.com/thaolt/chip8emu-agk)
 
 ## Screencasts
 
