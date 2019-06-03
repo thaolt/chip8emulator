@@ -430,15 +430,12 @@ int _chip8emu_opcode_handler_F(chip8emu* emu) {
         for (int i = 0; i <= ((emu->opcode & 0x0F00) >> 8); i++) {
             emu->memory[emu->I+i] = emu->V[i];
         }
-
-        emu->I += ((emu->opcode & 0x0F00) >> 8) + 1;
         emu->pc += 2;
         break;
     case 0x0065: /* FX65: */
         for (int i = 0; i <= ((emu->opcode & 0x0F00) >> 8); i++) {
             emu->V[i] = emu->memory[emu->I + i];
         }
-        emu->I += ((emu->opcode & 0x0F00) >> 8) + 1;
         emu->pc += 2;
         break;
     default:
